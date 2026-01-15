@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>廣大城租客管理系統 - 登入</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1><i class="fas fa-building"></i> 廣大城租客管理系統</h1>
+                <p>請選擇身分登入</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-type="tenant">租客登入</button>
+                <button class="auth-tab" data-type="admin">管理員登入</button>
+            </div>
+            
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i> 用戶名稱
+                    </label>
+                    <input type="text" id="username" name="username" required placeholder="請輸入用戶名">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i> 密碼
+                    </label>
+                    <input type="password" id="password" name="password" required placeholder="請輸入密碼">
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-sign-in-alt"></i> 登入系統
+                    </button>
+                </div>
+            </form>
+            
+            <div class="auth-footer">
+                <p>還沒有帳號？ <a href="/register.html">立即註冊</a></p>
+                <div class="demo-credentials">
+                    <h4>測試帳號：</h4>
+                    <p>管理員：admin / admin123</p>
+                    <p>租客：tenant1 / tenant123</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/auth.js"></script>
+</body>
+</html>
