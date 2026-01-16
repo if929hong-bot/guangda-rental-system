@@ -1,0 +1,8 @@
+[build]
+plan = []
+ECHO 已啟動。
+[phases]
+setup = "cd backend && npm install"
+ECHO 已啟動。
+[start]
+cmd = "cd backend && node server.js"
