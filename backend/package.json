@@ -1,7 +1,7 @@
 {
   "name": "guangda-rental-backend",
   "version": "1.0.0",
-  "description": "å»£å¤§åŸç§Ÿå®¢ç®¡ç†ç³»çµ±å¾Œç«¯",
+  "description": "¼s¤j«°¯²«ÈºŞ²z¨t²Î«áºİ",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
