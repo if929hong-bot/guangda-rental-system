@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>註冊 - 廣大城租客管理系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="register-page">
+    <div class="register-container">
+        <div class="register-box">
+            <div class="register-header">
+                <h1><i class="fas fa-user-plus"></i> 租客註冊</h1>
+                <p>請填寫以下資訊進行註冊</p>
+            </div>
+
+            <form id="registerForm" class="register-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username"><i class="fas fa-user"></i> 用戶名稱 *</label>
+                        <input type="text" id="username" name="username" required 
+                               placeholder="請設定用戶名稱">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password"><i class="fas fa-lock"></i> 密碼 *</label>
+                        <input type="password" id="password" name="password" required 
+                               placeholder="請設定密碼">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name"><i class="fas fa-id-card"></i> 姓名 *</label>
+                        <input type="text" id="name" name="name" required 
+                               placeholder="請輸入您的姓名">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="room_number"><i class="fas fa-door-closed"></i> 房號 *</label>
+                        <input type="text" id="room_number" name="room_number" required 
+                               placeholder="例如：101">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email"><i class="fas fa-envelope"></i> 電子郵件</label>
+                        <input type="email" id="email" name="email" 
+                               placeholder="example@gmail.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone"><i class="fas fa-phone"></i> 電話</label>
+                        <input type="tel" id="phone" name="phone" 
+                               placeholder="09XX-XXX-XXX">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="lease_start"><i class="fas fa-calendar-alt"></i> 租約開始日期 *</label>
+                        <input type="date" id="lease_start" name="lease_start" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lease_end"><i class="fas fa-calendar-alt"></i> 租約結束日期 *</label>
+                        <input type="date" id="lease_end" name="lease_end" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="rent_amount"><i class="fas fa-money-bill-wave"></i> 月租金 *</label>
+                    <input type="number" id="rent_amount" name="rent_amount" required 
+                           placeholder="請輸入月租金" min="0" step="100">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-user-plus"></i> 註冊帳號
+                </button>
+            </form>
+
+            <div class="register-footer">
+                <p>已經有帳號？ <a href="login.html?role=tenant">立即登入</a></p>
+                <p><a href="index.html"><i class="fas fa-arrow-left"></i> 返回首頁</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定日期預設值
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('lease_start').value = today;
+        
+        const oneYearLater = new Date();
+        oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        document.getElementById('lease_end').value = oneYearLater.toISOString().split('T')[0];
+        
+        // 處理註冊表單
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                name: document.getElementById('name').value,
+                room_number: document.getElementById('room_number').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                lease_start: document.getElementById('lease_start').value,
+                lease_end: document.getElementById('lease_end').value,
+                rent_amount: document.getElementById('rent_amount').value,
+                role: 'tenant'
+            };
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('註冊成功！請使用您的帳號密碼登入。');
+                    window.location.href = 'login.html?role=tenant';
+                } else {
+                    alert('註冊失敗：' + data.message);
+                }
+            } catch (error) {
+                console.error('註冊錯誤:', error);
+                alert('註冊時發生錯誤');
+            }
+        });
+    </script>
+</body>
+</html>

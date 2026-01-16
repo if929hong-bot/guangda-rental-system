@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>廣大城租客管理系統 - 管理員</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f5f5f5;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .tab-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-btn:hover:not(.active) {
+            background: #e0e0e0;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .action-btns {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .action-btn-view {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .action-btn-download {
+            background: #28a745;
+            color: white;
+        }
+        
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .image-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .image-preview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+        
+        .image-info {
+            padding: 15px;
+        }
+        
+        .image-info h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        
+        .image-info p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .detail-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            color: #666;
+        }
+        
+        .alert {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 標頭 -->
+        <div class="header">
+            <h1><i class="fas fa-user-shield"></i> 廣大城租客管理系統 - 管理員後台</h1>
+            <div class="user-info">
+                <div>
+                    <span id="adminName">載入中...</span>
+                    <span id="adminPhone" style="margin-left: 20px;"></span>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> 登出
+                </button>
+            </div>
+        </div>
+
+        <!-- 操作提示 -->
+        <div id="alertMessage" class="alert"></div>
+
+        <!-- 標籤頁 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('bank')">
+                <i class="fas fa-university"></i> 銀行資訊管理
+            </button>
+            <button class="tab-btn" onclick="switchTab('tenants')">
+                <i class="fas fa-users"></i> 租客管理
+            </button>
+            <button class="tab-btn" onclick="switchTab('images')">
+                <i class="fas fa-images"></i> 租客圖片管理
+            </button>
+        </div>
+
+        <!-- 銀行資訊管理 -->
+        <div id="bankTab" class="tab-content active">
+            <h2><i class="fas fa-university"></i> 銀行資訊設定</h2>
+            <p class="text-muted">設定收款銀行帳戶資訊，此資訊將同步顯示在租客頁面</p>
+            
+            <div class="form-group">
+                <label>銀行名稱</label>
+                <input type="text" id="bankName" class="form-control" placeholder="例如：元大銀行">
+            </div>
+            
+            <div class="form-group">
+                <label>分行名稱</label>
+                <input type="text" id="branchName" class="form-control" placeholder="例如：營業部">
+            </div>
+            
+            <div class="form-group">
+                <label>戶名</label>
+                <input type="text" id="accountName" class="form-control" placeholder="例如：廣大城物業管理">
+            </div>
+            
+            <div class="form-group">
+                <label>銀行帳號</label>
+                <input type="text" id="accountNumber" class="form-control" placeholder="例如：1234-5678-9012-3456">
+            </div>
+            
+            <div class="form-group">
+                <button class="btn btn-primary" onclick="loadBankInfo()">
+                    <i class="fas fa-sync"></i> 載入現有資訊
+                </button>
+                <button class="btn btn-primary" onclick="saveBankInfo()" style="margin-left: 10px;">
+                    <i class="fas fa-save"></i> 儲存銀行資訊
+                </button>
+            </div>
+            
+            <div id="bankInfoDisplay" style="margin-top: 30px; display: none;">
+                <h3>目前設定的銀行資訊</h3>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <p><strong>銀行名稱：</strong> <span id="currentBankName"></span></p>
+                    <p><strong>分行名稱：</strong> <span id="currentBranchName"></span></p>
+                    <p><strong>戶名：</strong> <span id="currentAccountName"></span></p>
+                    <p><strong>帳號：</strong> <span id="currentAccountNumber"></span></p>
+                    <p><strong>最後更新：</strong> <span id="lastUpdated"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 租客管理 -->
+        <div id="tenantsTab" class="tab-content">
+            <h2><i class="fas fa-users"></i> 租客資料管理</h2>
+            <p class="text-muted">查看所有租客註冊的詳細資訊</p>
+            
+            <div class="table-container">
+                <table class="data-table" id="tenantsTable">
+                    <thead>
+                        <tr>
+                            <th>姓名</th>
+                            <th>房號</th>
+                            <th>電話</th>
+                            <th>Email</th>
+                            <th>租約期間</th>
+                            <th>月租金</th>
+                            <th>註冊時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 資料將由 JavaScript 動態填入 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="tenantsLoading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> 載入租客資料中...
+            </div>
+            
+            <div id="tenantsEmpty" class="empty-state" style="display: none;">
+                <i class="fas fa-users-slash"></i>
+                <h3>暫無租客資料</h3>
+                <p>目前還沒有租客註冊</p>
+            </div>
+        </div>
+
+        <!-- 租客圖片管理 -->
+        <div id="imagesTab" class="tab-content">
+            <h2><i class="fas fa-images"></i> 租客上傳圖片管理</h2>
+            <p class="text-muted">查看和管理租客上傳的圖片檔案</p>
+            
+            <div class="image-grid" id="imagesGrid">
+                <!-- 圖片將由 JavaScript 動態填入 -->
+            </div>
+            
+            <div id="imagesLoading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> 載入圖片中...
+            </div>
+            
+            <div id="imagesEmpty" class="empty-state" style="display: none;">
+                <i class="fas fa-images"></i>
+                <h3>暫無上傳圖片</h3>
+                <p>租客尚未上傳任何圖片</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 租客詳情模態框 -->
+    <div class="modal" id="tenantModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user"></i> 租客詳細資料</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="tenantDetails">
+                <!-- 詳情將由 JavaScript 動態填入 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

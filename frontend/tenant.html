@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>租客中心 - 廣大城租客管理系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="tenant-page">
+    <!-- 頂部導航欄 -->
+    <header class="tenant-header">
+        <div class="header-left">
+            <h1><i class="fas fa-home"></i> 廣大城租客中心</h1>
+            <p>歡迎回來，<span id="tenantName">租客</span></p>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="currentUsername"></span>
+                <span class="room-badge" id="roomNumber"></span>
+            </div>
+            <button class="btn btn-secondary logout-btn">
+                <i class="fas fa-sign-out-alt"></i> 登出
+            </button>
+        </div>
+    </header>
+
+    <div class="tenant-container">
+        <!-- 左側選單 -->
+        <aside class="sidebar">
+            <nav class="sidebar-menu">
+                <a href="#dashboard" class="menu-item active">
+                    <i class="fas fa-tachometer-alt"></i> 儀表板
+                </a>
+                <a href="#payment" class="menu-item">
+                    <i class="fas fa-money-bill-wave"></i> 繳費記錄
+                </a>
+                <a href="#upload" class="menu-item">
+                    <i class="fas fa-cloud-upload-alt"></i> 圖片上傳
+                </a>
+                <a href="#bank-info" class="menu-item">
+                    <i class="fas fa-university"></i> 銀行資訊
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主內容區域 -->
+        <main class="main-content">
+            <!-- 儀表板頁面 -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-tachometer-alt"></i> 我的儀表板</h2>
+                    <button class="btn btn-primary" id="newPaymentBtn">
+                        <i class="fas fa-plus"></i> 新增繳費記錄
+                    </button>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- 個人資訊卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-user"></i> 個人資訊</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="info-label">姓名：</span>
+                                    <span class="info-value" id="tenantFullName"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">房號：</span>
+                                    <span class="info-value" id="dashboardRoom"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">電話：</span>
+                                    <span class="info-value" id="tenantPhone"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">郵箱：</span>
+                                    <span class="info-value" id="tenantEmail"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 租約資訊卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-contract"></i> 租約資訊</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="info-label">租約開始：</span>
+                                    <span class="info-value" id="leaseStart"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">租約結束：</span>
+                                    <span class="info-value" id="leaseEnd"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">月租金：</span>
+                                    <span class="info-value" id="monthlyRent"></span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">下期繳租：</span>
+                                    <span class="info-value" id="nextPayment"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 最新繳費記錄 -->
+                    <div class="card recent-payments">
+                        <div class="card-header">
+                            <h3><i class="fas fa-history"></i> 最近繳費記錄</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="recentPayments">
+                                <p class="empty-state">暫無繳費記錄</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 繳費記錄頁面 -->
+            <section id="payment" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-money-bill-wave"></i> 繳費記錄管理</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>繳費日期</th>
+                                        <th>房租</th>
+                                        <th>水費</th>
+                                        <th>電費(元/度)</th>
+                                        <th>上期電表</th>
+                                        <th>本期電表</th>
+                                        <th>用電度數</th>
+                                        <th>總金額</th>
+                                        <th>帳號後五碼</th>
+                                        <th>狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="paymentTableBody">
+                                    <!-- 繳費記錄會由 JS 動態填入 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 圖片上傳頁面 -->
+            <section id="upload" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> 圖片上傳</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="upload-area" id="dropZone">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <h3>拖曳圖片到此處或點擊選擇檔案</h3>
+                            <p>支援 JPG, PNG, GIF 格式，單檔最大 10MB</p>
+                            <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+                            <button class="btn btn-primary" id="selectFilesBtn">
+                                <i class="fas fa-folder-open"></i> 選擇檔案
+                            </button>
+                        </div>
+
+                        <div class="upload-progress" id="uploadProgress" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <p class="progress-text" id="progressText">上傳中...</p>
+                        </div>
+
+                        <div class="uploaded-images" id="uploadedImages">
+                            <h4>已上傳的圖片</h4>
+                            <div class="images-grid" id="imagesGrid">
+                                <!-- 已上傳的圖片會顯示在這裡 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 銀行資訊頁面 -->
+            <section id="bank-info" class="content-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-university"></i> 銀行轉帳資訊</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="bank-info-display">
+                            <div class="info-item">
+                                <span class="info-label">銀行名稱：</span>
+                                <span class="info-value" id="bankName">--</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">分行名稱：</span>
+                                <span class="info-value" id="branchName">--</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">戶名：</span>
+                                <span class="info-value" id="accountName">--</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">帳號：</span>
+                                <span class="info-value" id="accountNumber">--</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">最後更新：</span>
+                                <span class="info-value" id="lastUpdated">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="note-box">
+                            <p><i class="fas fa-info-circle"></i> 注意事項：</p>
+                            <ul>
+                                <li>請使用上方銀行資訊進行轉帳繳費</li>
+                                <li>轉帳完成後，請填寫繳費記錄並提供帳號後五碼</li>
+                                <li>繳費記錄需經管理員確認後才會更新狀態</li>
+                                <li>如有任何問題，請聯繫管理員</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 新增繳費記錄彈跳窗 -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-money-bill-wave"></i> 新增繳費記錄</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <div class="form-group">
+                        <label for="paymentDate">繳費日期 *</label>
+                        <input type="date" id="paymentDate" name="paymentDate" required 
+                               value="<?php echo date('Y-m-d'); ?>">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rentAmount">房租 *</label>
+                        <input type="number" id="rentAmount" name="rentAmount" required 
+                               placeholder="請輸入房租金額" step="0.01" min="0">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="waterFee">水費</label>
+                            <input type="number" id="waterFee" name="waterFee" 
+                                   placeholder="水費金額" step="0.01" min="0" value="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="electricityRate">電費 (元/度) *</label>
+                            <input type="number" id="electricityRate" name="electricityRate" required 
+                                   placeholder="每度電費" step="0.01" min="0" value="5.5">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="previousMeter">上期電表度數 *</label>
+                            <input type="number" id="previousMeter" name="previousMeter" required 
+                                   placeholder="上期電表度數" min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="currentMeter">本期電表度數 *</label>
+                            <input type="number" id="currentMeter" name="currentMeter" required 
+                                   placeholder="本期電表度數" min="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="electricityUsage">用電度數</label>
+                        <input type="number" id="electricityUsage" name="electricityUsage" 
+                               readonly placeholder="自動計算">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="electricityFee">電費小計</label>
+                        <input type="number" id="electricityFee" name="electricityFee" 
+                               readonly placeholder="自動計算">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="totalAmount">總金額</label>
+                        <input type="number" id="totalAmount" name="totalAmount" 
+                               readonly placeholder="自動計算" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="accountLastFive">轉帳帳號後五碼 *</label>
+                        <input type="text" id="accountLastFive" name="accountLastFive" required 
+                               placeholder="請輸入轉帳帳號後五碼" maxlength="5" pattern="[0-9]{5}">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary close-btn">取消</button>
+                <button class="btn btn-primary" id="submitPaymentBtn">提交繳費記錄</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 圖片預覽彈跳窗 -->
+    <div id="imagePreviewModal" class="modal">
+        <div class="modal-content image-preview">
+            <div class="modal-header">
+                <h3 id="imagePreviewTitle"></h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <img id="previewImage" src="" alt="圖片預覽">
+                <div class="image-info">
+                    <p id="imageFileName"></p>
+                    <p id="imageUploadDate"></p>
+                    <p id="imageFileSize"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="downloadImageBtn" class="btn btn-primary" download>
+                    <i class="fas fa-download"></i> 下載圖片
+                </a>
+                <button class="btn btn-secondary close-btn">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入 JavaScript -->
+    <script src="js/api.js"></script>
+    <script src="js/tenant.js"></script>
+</body>
+</html>
