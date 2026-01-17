@@ -87,10 +87,66 @@ function checkAdmin(req, res, next) {
     next();
 }
 
-// 1. 首頁路由 - 修改為指向 frontend 目錄的 index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend', 'index.html'));
+// ========== 添加的重要路由 ==========
+
+// 1. 根路径健康检查（Railway 需要）
+app.get('/health', (req, res) => {
+    console.log('根路径健康检查被调用');
+    res.status(200).send('OK');
 });
+
+// 2. 首頁路由
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>廣大城租客管理系統</title>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                h1 { color: #2c3e50; }
+                .status { color: green; font-weight: bold; }
+                .links { margin-top: 30px; }
+                .links a { display: inline-block; margin: 10px; padding: 10px 20px; 
+                           background: #3498db; color: white; text-decoration: none; 
+                           border-radius: 5px; }
+                .links a:hover { background: #2980b9; }
+            </style>
+        </head>
+        <body>
+            <h1>廣大城租客管理系統</h1>
+            <p class="status">✅ 伺服器運行正常</p>
+            <p>時間：${new Date().toLocaleString('zh-TW')}</p>
+            <div class="links">
+                <a href="/login.html">租客登入</a>
+                <a href="/admin.html">管理員登入</a>
+                <a href="/register.html">註冊帳號</a>
+                <a href="/api/health">系統狀態</a>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// 3. 前端页面路由
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'login.html'));
+});
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'admin.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'register.html'));
+});
+
+app.get('/tenant', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'tenant.html'));
+});
+
+// ========== 原有API路由 ==========
 
 // 2. 登入 API
 app.post('/api/login', async (req, res) => {
@@ -459,7 +515,7 @@ app.get('/api/admin/tenants', authenticateToken, checkAdmin, async (req, res) =>
     }
 });
 
-// 8. 健康檢查
+// 8. API健康檢查
 app.get('/api/health', (req, res) => {
     res.json({ 
         success: true, 
