@@ -61,6 +61,63 @@ const s3 = new AWS.S3({
 const CF_BUCKET_NAME = process.env.CF_BUCKET_NAME || 'guangda-rental-images';
 const CF_PUBLIC_DOMAIN = process.env.CF_PUBLIC_DOMAIN || 'pub-xxx.r2.dev';
 
+// ========== 全局数据存储 ==========
+// 为了数据持久化，我们将数据存储在文件中
+const fs = require('fs');
+const DATA_FILE = path.join(__dirname, 'data.json');
+
+// 初始化或加载数据
+let sharedData = {
+    payments: [],      // 所有缴费记录
+    images: [],        // 所有图片
+    tenants: [],       // 所有租客
+    bankInfo: {        // 银行信息
+        bank_name: '元大銀行',
+        branch_name: '營業部',
+        account_name: '廣大城',
+        account_number: '1111-2222-3333',
+        updated_at: new Date().toISOString()
+    }
+};
+
+// 尝试从文件加载数据
+try {
+    if (fs.existsSync(DATA_FILE)) {
+        const data = fs.readFileSync(DATA_FILE, 'utf8');
+        sharedData = JSON.parse(data);
+        console.log('数据已从文件加载');
+    } else {
+        // 初始化测试数据
+        sharedData.tenants.push({
+            id: 2,
+            username: 'tenant',
+            name: '測試租客',
+            email: 'tenant@example.com',
+            phone: '0911111111',
+            room_number: '101',
+            lease_start: '2024-01-01',
+            lease_end: '2024-12-31',
+            rent_amount: '15000',
+            role: 'tenant',
+            created_at: new Date().toISOString()
+        });
+        saveData();
+        console.log('测试数据已初始化');
+    }
+} catch (error) {
+    console.error('加载数据文件失败:', error);
+}
+
+// 保存数据到文件
+function saveData() {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(sharedData, null, 2));
+        console.log('数据已保存到文件');
+    } catch (error) {
+        console.error('保存数据失败:', error);
+    }
+}
+
 // 驗證 Token 中介軟體
 async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -87,15 +144,15 @@ function checkAdmin(req, res, next) {
     next();
 }
 
-// ========== 添加的重要路由 ==========
+// ========== API 路由 ==========
 
-// 1. 根路径健康检查（Railway 需要）
+// 1. 健康检查
 app.get('/health', (req, res) => {
     console.log('根路径健康检查被调用');
     res.status(200).send('OK');
 });
 
-// 2. 首頁路由
+// 2. 首页路由
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -146,9 +203,9 @@ app.get('/tenant', (req, res) => {
     res.sendFile(path.join(projectRoot, 'frontend', 'tenant.html'));
 });
 
-// ========== 原有API路由 ==========
+// ========== 用户认证 API ==========
 
-// 2. 登入 API
+// 4. 登入 API
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password, role } = req.body;
@@ -189,30 +246,54 @@ app.post('/api/login', async (req, res) => {
             }
         }
         
-        // 租客測試帳號
-        if (username === 'tenant' && password === '123456' && role === 'tenant') {
-            const token = jwt.sign(
-                { id: 2, username: 'tenant', role: 'tenant' },
-                JWT_SECRET,
-                { expiresIn: '24h' }
+        // 租客帳號驗證
+        if (role === 'tenant') {
+            // 先檢查測試帳號
+            if (username === 'tenant' && password === '123456') {
+                const tenant = sharedData.tenants.find(t => t.username === 'tenant');
+                if (tenant) {
+                    const token = jwt.sign(
+                        { 
+                            id: tenant.id, 
+                            username: tenant.username, 
+                            role: 'tenant',
+                            name: tenant.name
+                        },
+                        JWT_SECRET,
+                        { expiresIn: '24h' }
+                    );
+                    
+                    return res.json({
+                        success: true,
+                        token,
+                        user: tenant
+                    });
+                }
+            }
+            
+            // 檢查註冊的帳號
+            const tenant = sharedData.tenants.find(t => 
+                t.username === username && t.password === password
             );
             
-            return res.json({
-                success: true,
-                token,
-                user: {
-                    id: 2,
-                    username: 'tenant',
-                    name: '測試租客',
-                    email: 'tenant@example.com',
-                    phone: '0911111111',
-                    role: 'tenant',
-                    room_number: '101',
-                    lease_start: '2024-01-01',
-                    lease_end: '2024-12-31',
-                    rent_amount: '15000'
-                }
-            });
+            if (tenant) {
+                const token = jwt.sign(
+                    { 
+                        id: tenant.id, 
+                        username: tenant.username, 
+                        role: 'tenant',
+                        name: tenant.name
+                    },
+                    JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+                
+                return res.json({
+                    success: true,
+                    token,
+                    user: tenant
+                });
+            }
         }
         
         res.status(401).json({ 
@@ -228,7 +309,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 3. 註冊 API
+// 5. 註冊 API
 app.post('/api/register', async (req, res) => {
     try {
         const { 
@@ -243,10 +324,19 @@ app.post('/api/register', async (req, res) => {
             rent_amount 
         } = req.body;
         
-        // 簡單的註冊邏輯
+        // 檢查用戶名是否已存在
+        if (sharedData.tenants.some(t => t.username === username)) {
+            return res.status(400).json({
+                success: false,
+                message: '用戶名已存在'
+            });
+        }
+        
+        // 創建新用戶
         const newUser = {
             id: Date.now(),
             username,
+            password, // 注意：實際應用中應該加密儲存
             name,
             room_number,
             email,
@@ -254,8 +344,13 @@ app.post('/api/register', async (req, res) => {
             lease_start,
             lease_end,
             rent_amount,
-            role: 'tenant'
+            role: 'tenant',
+            created_at: new Date().toISOString()
         };
+        
+        // 添加到租客列表
+        sharedData.tenants.push(newUser);
+        saveData();
         
         // 產生 token
         const token = jwt.sign(
@@ -268,11 +363,14 @@ app.post('/api/register', async (req, res) => {
             { expiresIn: '24h' }
         );
         
+        // 不返回密碼
+        const { password: _, ...userWithoutPassword } = newUser;
+        
         res.json({
             success: true,
             message: '註冊成功',
             token,
-            user: newUser
+            user: userWithoutPassword
         });
     } catch (error) {
         console.error('註冊錯誤:', error);
@@ -283,19 +381,14 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// 4. 銀行資訊 API
+// ========== 銀行資訊 API ==========
+
+// 6. 取得銀行資訊（租客和管理員都能用）
 app.get('/api/bank-info', authenticateToken, async (req, res) => {
     try {
-        // 模擬銀行資訊
         res.json({
             success: true,
-            bankInfo: {
-                bank_name: '元大銀行',
-                branch_name: '營業部',
-                account_name: '廣大城',
-                account_number: '1111-2222-3333',
-                updated_at: new Date().toISOString()
-            }
+            bankInfo: sharedData.bankInfo
         });
     } catch (error) {
         console.error('取得銀行資訊錯誤:', error);
@@ -306,20 +399,25 @@ app.get('/api/bank-info', authenticateToken, async (req, res) => {
     }
 });
 
+// 7. 更新銀行資訊（僅管理員）
 app.put('/api/bank-info', authenticateToken, checkAdmin, async (req, res) => {
     try {
         const { bank_name, branch_name, account_name, account_number } = req.body;
         
+        // 更新銀行資訊
+        sharedData.bankInfo = {
+            bank_name,
+            branch_name,
+            account_name,
+            account_number,
+            updated_at: new Date().toISOString()
+        };
+        saveData();
+        
         res.json({
             success: true,
             message: '銀行資訊已更新',
-            bankInfo: {
-                bank_name,
-                branch_name,
-                account_name,
-                account_number,
-                updated_at: new Date().toISOString()
-            }
+            bankInfo: sharedData.bankInfo
         });
     } catch (error) {
         console.error('更新銀行資訊錯誤:', error);
@@ -330,13 +428,20 @@ app.put('/api/bank-info', authenticateToken, checkAdmin, async (req, res) => {
     }
 });
 
-// 5. 繳費記錄 API
-const payments = []; // 暫時用陣列儲存
+// ========== 繳費記錄 API ==========
 
+// 8. 取得繳費記錄
 app.get('/api/payments', authenticateToken, async (req, res) => {
     try {
-        // 只回傳當前使用者的繳費記錄
-        const userPayments = payments.filter(p => p.tenant_id === req.user.id);
+        let userPayments;
+        
+        // 管理員可以查看所有繳費記錄
+        if (req.user.role === 'admin') {
+            userPayments = sharedData.payments;
+        } else {
+            // 租客只能看到自己的繳費記錄
+            userPayments = sharedData.payments.filter(p => p.tenant_id === req.user.id);
+        }
         
         res.json({
             success: true,
@@ -351,6 +456,7 @@ app.get('/api/payments', authenticateToken, async (req, res) => {
     }
 });
 
+// 9. 新增繳費記錄
 app.post('/api/payments', authenticateToken, async (req, res) => {
     try {
         const {
@@ -365,8 +471,9 @@ app.post('/api/payments', authenticateToken, async (req, res) => {
         } = req.body;
         
         const newPayment = {
-            id: payments.length + 1,
+            id: sharedData.payments.length + 1,
             tenant_id: req.user.id,
+            tenant_name: req.user.name || req.user.username,
             payment_date,
             rent_amount,
             water_fee: water_fee || 0,
@@ -379,7 +486,8 @@ app.post('/api/payments', authenticateToken, async (req, res) => {
             created_at: new Date().toISOString()
         };
         
-        payments.push(newPayment);
+        sharedData.payments.push(newPayment);
+        saveData();
         
         res.json({
             success: true,
@@ -395,12 +503,20 @@ app.post('/api/payments', authenticateToken, async (req, res) => {
     }
 });
 
-// 6. 圖片上傳相關 API
-const images = []; // 暫時用陣列儲存
+// ========== 圖片上傳 API ==========
 
+// 10. 取得圖片列表
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
-        const userImages = images.filter(img => img.tenant_id === req.user.id);
+        let userImages;
+        
+        // 管理員可以查看所有圖片
+        if (req.user.role === 'admin') {
+            userImages = sharedData.images;
+        } else {
+            // 租客只能看到自己的圖片
+            userImages = sharedData.images.filter(img => img.tenant_id === req.user.id);
+        }
         
         res.json({
             success: true,
@@ -415,7 +531,7 @@ app.get('/api/images', authenticateToken, async (req, res) => {
     }
 });
 
-// 取得上傳簽章 URL
+// 11. 取得上傳簽章 URL
 app.post('/api/images/upload-url', authenticateToken, async (req, res) => {
     try {
         if (!process.env.CF_ACCOUNT_ID) {
@@ -452,21 +568,23 @@ app.post('/api/images/upload-url', authenticateToken, async (req, res) => {
     }
 });
 
-// 儲存圖片資訊
+// 12. 儲存圖片資訊
 app.post('/api/images/save', authenticateToken, async (req, res) => {
     try {
         const { image_url, file_name, file_size } = req.body;
         
         const newImage = {
-            id: images.length + 1,
+            id: sharedData.images.length + 1,
             tenant_id: req.user.id,
+            tenant_name: req.user.name || req.user.username,
             image_url,
             file_name,
             file_size,
             uploaded_at: new Date().toISOString()
         };
         
-        images.push(newImage);
+        sharedData.images.push(newImage);
+        saveData();
         
         res.json({
             success: true,
@@ -482,29 +600,20 @@ app.post('/api/images/save', authenticateToken, async (req, res) => {
     }
 });
 
-// 7. 管理員 API
-// 取得所有租客
+// ========== 管理員 API ==========
+
+// 13. 取得所有租客
 app.get('/api/admin/tenants', authenticateToken, checkAdmin, async (req, res) => {
     try {
-        // 模擬租客資料
-        const tenants = [
-            {
-                id: 2,
-                username: 'tenant',
-                name: '測試租客',
-                email: 'tenant@example.com',
-                phone: '0911111111',
-                room_number: '101',
-                lease_start: '2024-01-01',
-                lease_end: '2024-12-31',
-                rent_amount: '15000',
-                created_at: new Date().toISOString()
-            }
-        ];
+        // 移除密碼字段
+        const tenantsWithoutPassword = sharedData.tenants.map(tenant => {
+            const { password, ...tenantWithoutPassword } = tenant;
+            return tenantWithoutPassword;
+        });
         
         res.json({
             success: true,
-            tenants
+            tenants: tenantsWithoutPassword
         });
     } catch (error) {
         console.error('取得租客列表錯誤:', error);
@@ -515,12 +624,17 @@ app.get('/api/admin/tenants', authenticateToken, checkAdmin, async (req, res) =>
     }
 });
 
-// 8. API健康檢查
+// 14. API健康檢查
 app.get('/api/health', (req, res) => {
     res.json({ 
         success: true, 
         message: '系統運作正常',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        dataCounts: {
+            tenants: sharedData.tenants.length,
+            payments: sharedData.payments.length,
+            images: sharedData.images.length
+        }
     });
 });
 

@@ -1,3 +1,4 @@
+// frontend/js/admin.js - 修复版
 // 管理員頁面 JavaScript
 let currentUser = null;
 let allTenants = [];
@@ -28,8 +29,15 @@ function checkAuth() {
 // 載入管理員資訊
 function loadAdminInfo() {
     if (currentUser) {
-        document.getElementById('adminName').textContent = currentUser.name || currentUser.username;
-        document.getElementById('adminPhone').textContent = `電話：${currentUser.phone}`;
+        const adminName = document.getElementById('adminName');
+        const adminPhone = document.getElementById('adminPhone');
+        
+        if (adminName) {
+            adminName.textContent = currentUser.name || currentUser.username;
+        }
+        if (adminPhone) {
+            adminPhone.textContent = `電話：${currentUser.phone}`;
+        }
     }
 }
 
@@ -46,20 +54,29 @@ function switchTab(tabName) {
     });
     
     // 啟用當前標籤
-    document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
-    document.getElementById(`${tabName}Tab`).classList.add('active');
+    const activeBtn = document.querySelector(`[onclick="switchTab('${tabName}')"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+    
+    const activeTab = document.getElementById(`${tabName}Tab`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+    }
 }
 
 // 顯示提示訊息
 function showAlert(message, type = 'success') {
     const alertDiv = document.getElementById('alertMessage');
-    alertDiv.textContent = message;
-    alertDiv.className = `alert alert-${type}`;
-    alertDiv.style.display = 'block';
-    
-    setTimeout(() => {
-        alertDiv.style.display = 'none';
-    }, 5000);
+    if (alertDiv) {
+        alertDiv.textContent = message;
+        alertDiv.className = `alert alert-${type}`;
+        alertDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            alertDiv.style.display = 'none';
+        }, 5000);
+    }
 }
 
 // 載入銀行資訊
@@ -77,19 +94,30 @@ function loadBankInfo() {
             const bankInfo = data.bankInfo;
             
             // 填入表單
-            document.getElementById('bankName').value = bankInfo.bank_name || '';
-            document.getElementById('branchName').value = bankInfo.branch_name || '';
-            document.getElementById('accountName').value = bankInfo.account_name || '';
-            document.getElementById('accountNumber').value = bankInfo.account_number || '';
+            const bankNameInput = document.getElementById('bankName');
+            const branchNameInput = document.getElementById('branchName');
+            const accountNameInput = document.getElementById('accountName');
+            const accountNumberInput = document.getElementById('accountNumber');
+            
+            if (bankNameInput) bankNameInput.value = bankInfo.bank_name || '';
+            if (branchNameInput) branchNameInput.value = bankInfo.branch_name || '';
+            if (accountNameInput) accountNameInput.value = bankInfo.account_name || '';
+            if (accountNumberInput) accountNumberInput.value = bankInfo.account_number || '';
             
             // 顯示當前資訊
-            document.getElementById('currentBankName').textContent = bankInfo.bank_name || '未設定';
-            document.getElementById('currentBranchName').textContent = bankInfo.branch_name || '未設定';
-            document.getElementById('currentAccountName').textContent = bankInfo.account_name || '未設定';
-            document.getElementById('currentAccountNumber').textContent = bankInfo.account_number || '未設定';
-            document.getElementById('lastUpdated').textContent = new Date(bankInfo.updated_at).toLocaleString('zh-TW');
+            const currentBankName = document.getElementById('currentBankName');
+            const currentBranchName = document.getElementById('currentBranchName');
+            const currentAccountName = document.getElementById('currentAccountName');
+            const currentAccountNumber = document.getElementById('currentAccountNumber');
+            const lastUpdated = document.getElementById('lastUpdated');
+            const bankInfoDisplay = document.getElementById('bankInfoDisplay');
             
-            document.getElementById('bankInfoDisplay').style.display = 'block';
+            if (currentBankName) currentBankName.textContent = bankInfo.bank_name || '未設定';
+            if (currentBranchName) currentBranchName.textContent = bankInfo.branch_name || '未設定';
+            if (currentAccountName) currentAccountName.textContent = bankInfo.account_name || '未設定';
+            if (currentAccountNumber) currentAccountNumber.textContent = bankInfo.account_number || '未設定';
+            if (lastUpdated) lastUpdated.textContent = new Date(bankInfo.updated_at).toLocaleString('zh-TW');
+            if (bankInfoDisplay) bankInfoDisplay.style.display = 'block';
         } else {
             showAlert('載入銀行資訊失敗', 'error');
         }
@@ -102,11 +130,21 @@ function loadBankInfo() {
 
 // 儲存銀行資訊
 function saveBankInfo() {
+    const bankNameInput = document.getElementById('bankName');
+    const branchNameInput = document.getElementById('branchName');
+    const accountNameInput = document.getElementById('accountName');
+    const accountNumberInput = document.getElementById('accountNumber');
+    
+    if (!bankNameInput || !branchNameInput || !accountNameInput || !accountNumberInput) {
+        showAlert('表單元素未找到', 'error');
+        return;
+    }
+    
     const bankInfo = {
-        bank_name: document.getElementById('bankName').value,
-        branch_name: document.getElementById('branchName').value,
-        account_name: document.getElementById('accountName').value,
-        account_number: document.getElementById('accountNumber').value
+        bank_name: bankNameInput.value,
+        branch_name: branchNameInput.value,
+        account_name: accountNameInput.value,
+        account_number: accountNumberInput.value
     };
     
     // 簡單驗證
@@ -144,9 +182,9 @@ function loadTenants() {
     const empty = document.getElementById('tenantsEmpty');
     const tableBody = document.querySelector('#tenantsTable tbody');
     
-    loading.style.display = 'block';
-    empty.style.display = 'none';
-    tableBody.innerHTML = '';
+    if (loading) loading.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (tableBody) tableBody.innerHTML = '';
     
     fetch('/api/admin/tenants', {
         method: 'GET',
@@ -157,7 +195,7 @@ function loadTenants() {
     })
     .then(response => response.json())
     .then(data => {
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
         
         if (data.success && data.tenants && data.tenants.length > 0) {
             allTenants = data.tenants;
@@ -181,15 +219,17 @@ function loadTenants() {
                     </td>
                 `;
                 
-                tableBody.appendChild(row);
+                if (tableBody) {
+                    tableBody.appendChild(row);
+                }
             });
         } else {
-            empty.style.display = 'block';
+            if (empty) empty.style.display = 'block';
         }
     })
     .catch(error => {
         console.error('載入租客資料錯誤:', error);
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
         showAlert('載入租客資料時發生錯誤', 'error');
     });
 }
@@ -205,6 +245,11 @@ function viewTenantDetails(tenantId) {
     
     const modal = document.getElementById('tenantModal');
     const detailsDiv = document.getElementById('tenantDetails');
+    
+    if (!modal || !detailsDiv) {
+        showAlert('無法打開租客詳情', 'error');
+        return;
+    }
     
     // 構建詳情HTML
     detailsDiv.innerHTML = `
@@ -267,9 +312,9 @@ function loadAllImages() {
     const empty = document.getElementById('imagesEmpty');
     const grid = document.getElementById('imagesGrid');
     
-    loading.style.display = 'block';
-    empty.style.display = 'none';
-    grid.innerHTML = '';
+    if (loading) loading.style.display = 'block';
+    if (empty) empty.style.display = 'none';
+    if (grid) grid.innerHTML = '';
     
     fetch('/api/images', {
         method: 'GET',
@@ -280,7 +325,7 @@ function loadAllImages() {
     })
     .then(response => response.json())
     .then(data => {
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
         
         if (data.success && data.images && data.images.length > 0) {
             allImages = data.images;
@@ -312,15 +357,17 @@ function loadAllImages() {
                     </div>
                 `;
                 
-                grid.appendChild(card);
+                if (grid) {
+                    grid.appendChild(card);
+                }
             });
         } else {
-            empty.style.display = 'block';
+            if (empty) empty.style.display = 'block';
         }
     })
     .catch(error => {
         console.error('載入圖片錯誤:', error);
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
         showAlert('載入圖片時發生錯誤', 'error');
     });
 }
@@ -365,7 +412,10 @@ function downloadImage(imageUrl, fileName) {
 
 // 關閉模態框
 function closeModal() {
-    document.getElementById('tenantModal').classList.remove('active');
+    const modal = document.getElementById('tenantModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
 }
 
 // 登出

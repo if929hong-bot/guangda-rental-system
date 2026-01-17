@@ -1,3 +1,4 @@
+// frontend/js/api.js - 修复版
 // API 基礎設定 - 如果是開發環境使用本地，上線使用 Railway 網址
 const API_BASE_URL = window.location.origin; // 自動偵測當前網域
 
@@ -69,7 +70,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 }
 
 // 使用者相關 API
-export const userApi = {
+const userApi = {
     // 登入
     login: (username, password, role) => 
         apiRequest('/login', 'POST', { username, password, role }),
@@ -90,7 +91,7 @@ export const userApi = {
 };
 
 // 銀行資訊相關 API
-export const bankApi = {
+const bankApi = {
     // 取得銀行資訊 (租客用)
     getBankInfo: () => 
         apiRequest('/bank-info'),
@@ -101,7 +102,7 @@ export const bankApi = {
 };
 
 // 繳費記錄相關 API
-export const paymentApi = {
+const paymentApi = {
     // 取得租客的繳費記錄
     getPayments: () => 
         apiRequest('/payments'),
@@ -112,7 +113,7 @@ export const paymentApi = {
 };
 
 // 圖片相關 API
-export const imageApi = {
+const imageApi = {
     // 取得圖片列表
     getImages: () => 
         apiRequest('/images'),
@@ -127,14 +128,14 @@ export const imageApi = {
 };
 
 // 管理員相關 API
-export const adminApi = {
+const adminApi = {
     // 取得所有租客資料
     getAllTenants: () => 
         apiRequest('/admin/tenants')
 };
 
 // 匯出所有 API
-export default {
+const api = {
     userApi,
     bankApi,
     paymentApi,
@@ -144,3 +145,12 @@ export default {
     getUserInfo,
     getToken
 };
+
+// 全局導出，兼容 CommonJS 和 ES6 模塊
+if (typeof module !== 'undefined' && module.exports) {
+    // CommonJS
+    module.exports = api;
+} else {
+    // 瀏覽器環境
+    window.api = api;
+}

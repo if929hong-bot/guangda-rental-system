@@ -1,4 +1,6 @@
-import api, { checkAuth, getUserInfo } from './api.js';
+// frontend/js/tenant.js - 修复版
+// 移除 ES6 導入語法，改用全局對象
+const api = window.api || {};
 
 // DOM 元素
 const DOM = {
@@ -74,10 +76,10 @@ const paymentFormElements = {
 
 // 初始化
 async function init() {
-    if (!checkAuth()) return;
+    if (!api.checkAuth()) return;
     
     // 檢查使用者角色
-    const user = getUserInfo();
+    const user = api.getUserInfo();
     if (user.role !== 'tenant') {
         alert('您不是租客，無法訪問此頁面');
         window.location.href = user.role === 'admin' ? 'admin.html' : 'index.html';
@@ -241,7 +243,7 @@ function createImageThumbnail(image) {
     const div = document.createElement('div');
     div.className = 'image-item';
     div.innerHTML = `
-        <img src="${image.thumbnail_url || image.image_url}" 
+        <img src="${image.image_url}" 
              alt="${image.file_name}" 
              class="image-thumbnail"
              data-image-id="${image.id}"
@@ -281,85 +283,107 @@ function bindEvents() {
     });
     
     // 新增繳費記錄按鈕
-    DOM.newPaymentBtn.addEventListener('click', () => {
-        DOM.paymentModal.classList.add('active');
-    });
+    if (DOM.newPaymentBtn) {
+        DOM.newPaymentBtn.addEventListener('click', () => {
+            if (DOM.paymentModal) {
+                DOM.paymentModal.classList.add('active');
+            }
+        });
+    }
     
     // 繳費表單計算邏輯
-    paymentFormElements.rentAmount.addEventListener('input', calculateTotal);
-    paymentFormElements.waterFee.addEventListener('input', calculateTotal);
-    paymentFormElements.electricityRate.addEventListener('input', calculateTotal);
-    paymentFormElements.previousMeter.addEventListener('input', calculateTotal);
-    paymentFormElements.currentMeter.addEventListener('input', calculateTotal);
-    
-    // 提交繳費記錄
-    DOM.submitPaymentBtn.addEventListener('click', submitPayment);
-    
-    // 圖片上傳相關事件
-    DOM.selectFilesBtn.addEventListener('click', () => {
-        DOM.fileInput.click();
-    });
-    
-    DOM.fileInput.addEventListener('change', handleFileSelect);
-    
-    // 拖曳上傳
-    DOM.dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        DOM.dropZone.classList.add('drag-over');
-    });
-    
-    DOM.dropZone.addEventListener('dragleave', () => {
-        DOM.dropZone.classList.remove('drag-over');
-    });
-    
-    DOM.dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        DOM.dropZone.classList.remove('drag-over');
-        
-        const files = e.dataTransfer.files;
-        handleFiles(files);
-    });
-    
-    // 圖片點擊預覽
-    DOM.imagesGrid.addEventListener('click', (e) => {
-        const thumbnail = e.target.closest('.image-thumbnail');
-        if (thumbnail) {
-            showImagePreview(thumbnail);
+    Object.values(paymentFormElements).forEach(element => {
+        if (element && element.addEventListener) {
+            element.addEventListener('input', calculateTotal);
         }
     });
+    
+    // 提交繳費記錄
+    if (DOM.submitPaymentBtn) {
+        DOM.submitPaymentBtn.addEventListener('click', submitPayment);
+    }
+    
+    // 圖片上傳相關事件
+    if (DOM.selectFilesBtn) {
+        DOM.selectFilesBtn.addEventListener('click', () => {
+            if (DOM.fileInput) {
+                DOM.fileInput.click();
+            }
+        });
+    }
+    
+    if (DOM.fileInput) {
+        DOM.fileInput.addEventListener('change', handleFileSelect);
+    }
+    
+    // 拖曳上傳
+    if (DOM.dropZone) {
+        DOM.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            DOM.dropZone.classList.add('drag-over');
+        });
+        
+        DOM.dropZone.addEventListener('dragleave', () => {
+            DOM.dropZone.classList.remove('drag-over');
+        });
+        
+        DOM.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            DOM.dropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+    }
+    
+    // 圖片點擊預覽
+    if (DOM.imagesGrid) {
+        DOM.imagesGrid.addEventListener('click', (e) => {
+            const thumbnail = e.target.closest('.image-thumbnail');
+            if (thumbnail) {
+                showImagePreview(thumbnail);
+            }
+        });
+    }
     
     // 關閉彈跳窗
     DOM.closeModalBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            DOM.paymentModal.classList.remove('active');
-            DOM.imagePreviewModal.classList.remove('active');
+            if (DOM.paymentModal) DOM.paymentModal.classList.remove('active');
+            if (DOM.imagePreviewModal) DOM.imagePreviewModal.classList.remove('active');
         });
     });
     
     // 點擊背景關閉彈跳窗
     [DOM.paymentModal, DOM.imagePreviewModal].forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        });
-    });
-    
-    // 登出
-    DOM.logoutBtn.addEventListener('click', () => {
-        if (confirm('確定要登出嗎？')) {
-            api.userApi.logout();
-            window.location.href = 'index.html';
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
         }
     });
     
+    // 登出
+    if (DOM.logoutBtn) {
+        DOM.logoutBtn.addEventListener('click', () => {
+            if (confirm('確定要登出嗎？')) {
+                api.userApi.logout();
+                window.location.href = 'index.html';
+            }
+        });
+    }
+    
     // 設定預設繳費日期為今天
-    const today = new Date().toISOString().split('T')[0];
-    paymentFormElements.paymentDate.value = today;
+    if (paymentFormElements.paymentDate) {
+        const today = new Date().toISOString().split('T')[0];
+        paymentFormElements.paymentDate.value = today;
+    }
     
     // 設定預設房租為使用者設定的租金
-    const user = getUserInfo();
-    if (user.rent_amount) {
+    const user = api.getUserInfo();
+    if (user.rent_amount && paymentFormElements.rentAmount) {
         paymentFormElements.rentAmount.value = user.rent_amount;
         calculateTotal();
     }
@@ -367,41 +391,49 @@ function bindEvents() {
 
 // 計算總金額
 function calculateTotal() {
-    const rent = parseFloat(paymentFormElements.rentAmount.value) || 0;
-    const water = parseFloat(paymentFormElements.waterFee.value) || 0;
-    const rate = parseFloat(paymentFormElements.electricityRate.value) || 0;
-    const previous = parseInt(paymentFormElements.previousMeter.value) || 0;
-    const current = parseInt(paymentFormElements.currentMeter.value) || 0;
+    const rent = parseFloat(paymentFormElements.rentAmount?.value) || 0;
+    const water = parseFloat(paymentFormElements.waterFee?.value) || 0;
+    const rate = parseFloat(paymentFormElements.electricityRate?.value) || 0;
+    const previous = parseInt(paymentFormElements.previousMeter?.value) || 0;
+    const current = parseInt(paymentFormElements.currentMeter?.value) || 0;
     
     // 計算用電度數和電費
     const usage = current - previous;
     const electricityFee = usage * rate;
     
     // 更新表單
-    paymentFormElements.electricityUsage.value = usage > 0 ? usage : 0;
-    paymentFormElements.electricityFee.value = electricityFee > 0 ? electricityFee.toFixed(2) : 0;
+    if (paymentFormElements.electricityUsage) {
+        paymentFormElements.electricityUsage.value = usage > 0 ? usage : 0;
+    }
+    if (paymentFormElements.electricityFee) {
+        paymentFormElements.electricityFee.value = electricityFee > 0 ? electricityFee.toFixed(2) : 0;
+    }
     
     // 計算總金額
     const total = rent + water + electricityFee;
-    paymentFormElements.totalAmount.value = total.toFixed(2);
+    if (paymentFormElements.totalAmount) {
+        paymentFormElements.totalAmount.value = total.toFixed(2);
+    }
 }
 
 // 提交繳費記錄
 async function submitPayment() {
-    if (!DOM.paymentForm.checkValidity()) {
-        DOM.paymentForm.reportValidity();
+    if (!DOM.paymentForm?.checkValidity()) {
+        if (DOM.paymentForm) {
+            DOM.paymentForm.reportValidity();
+        }
         return;
     }
     
     const paymentData = {
-        payment_date: paymentFormElements.paymentDate.value,
-        rent_amount: parseFloat(paymentFormElements.rentAmount.value),
-        water_fee: parseFloat(paymentFormElements.waterFee.value) || 0,
-        electricity_rate: parseFloat(paymentFormElements.electricityRate.value),
-        previous_meter: parseInt(paymentFormElements.previousMeter.value),
-        current_meter: parseInt(paymentFormElements.currentMeter.value),
-        total_amount: parseFloat(paymentFormElements.totalAmount.value),
-        account_last_five: document.getElementById('accountLastFive').value
+        payment_date: paymentFormElements.paymentDate?.value || new Date().toISOString().split('T')[0],
+        rent_amount: parseFloat(paymentFormElements.rentAmount?.value) || 0,
+        water_fee: parseFloat(paymentFormElements.waterFee?.value) || 0,
+        electricity_rate: parseFloat(paymentFormElements.electricityRate?.value) || 0,
+        previous_meter: parseInt(paymentFormElements.previousMeter?.value) || 0,
+        current_meter: parseInt(paymentFormElements.currentMeter?.value) || 0,
+        total_amount: parseFloat(paymentFormElements.totalAmount?.value) || 0,
+        account_last_five: document.getElementById('accountLastFive')?.value || ''
     };
     
     try {
@@ -413,7 +445,9 @@ async function submitPayment() {
         if (data.success) {
             alert('繳費記錄已提交，請等待管理員確認。');
             DOM.paymentModal.classList.remove('active');
-            DOM.paymentForm.reset();
+            if (DOM.paymentForm) {
+                DOM.paymentForm.reset();
+            }
             
             // 重新載入繳費記錄
             await loadPaymentRecords();
@@ -455,16 +489,24 @@ async function handleFiles(files) {
     }
     
     // 清空 input
-    DOM.fileInput.value = '';
+    if (DOM.fileInput) {
+        DOM.fileInput.value = '';
+    }
 }
 
 // 上傳檔案到 Cloudflare R2
 async function uploadFile(file) {
     try {
         // 顯示上傳進度
-        DOM.uploadProgress.style.display = 'block';
-        DOM.progressFill.style.width = '0%';
-        DOM.progressText.textContent = `準備上傳 ${file.name}...`;
+        if (DOM.uploadProgress) {
+            DOM.uploadProgress.style.display = 'block';
+        }
+        if (DOM.progressFill) {
+            DOM.progressFill.style.width = '0%';
+        }
+        if (DOM.progressText) {
+            DOM.progressText.textContent = `準備上傳 ${file.name}...`;
+        }
         
         // 取得上傳 URL
         const urlData = await api.imageApi.getUploadUrl();
@@ -489,20 +531,26 @@ async function uploadFile(file) {
         const imageUrl = urlData.publicUrl || response.url;
         
         // 在資料庫中記錄圖片資訊
-        const saveData = await api.imageApi.uploadImage({
+        const saveData = await api.imageApi.saveImageInfo({
             image_url: imageUrl,
             file_name: file.name,
             file_size: file.size
         });
         
         if (saveData.success) {
-            DOM.progressFill.style.width = '100%';
-            DOM.progressText.textContent = `${file.name} 上傳成功！`;
+            if (DOM.progressFill) {
+                DOM.progressFill.style.width = '100%';
+            }
+            if (DOM.progressText) {
+                DOM.progressText.textContent = `${file.name} 上傳成功！`;
+            }
             
             // 重新載入圖片列表
             setTimeout(() => {
                 loadUploadedImages();
-                DOM.uploadProgress.style.display = 'none';
+                if (DOM.uploadProgress) {
+                    DOM.uploadProgress.style.display = 'none';
+                }
             }, 1000);
         } else {
             throw new Error('儲存圖片資訊失敗');
@@ -510,12 +558,20 @@ async function uploadFile(file) {
         
     } catch (error) {
         console.error('上傳失敗:', error);
-        DOM.progressText.textContent = `${file.name} 上傳失敗: ${error.message}`;
-        DOM.progressFill.style.background = 'var(--danger)';
+        if (DOM.progressText) {
+            DOM.progressText.textContent = `${file.name} 上傳失敗: ${error.message}`;
+        }
+        if (DOM.progressFill) {
+            DOM.progressFill.style.background = 'var(--danger)';
+        }
         
         setTimeout(() => {
-            DOM.uploadProgress.style.display = 'none';
-            DOM.progressFill.style.background = '';
+            if (DOM.uploadProgress) {
+                DOM.uploadProgress.style.display = 'none';
+            }
+            if (DOM.progressFill) {
+                DOM.progressFill.style.background = '';
+            }
         }, 3000);
     }
 }
@@ -527,15 +583,19 @@ function showImagePreview(thumbnail) {
     const uploadDate = thumbnail.getAttribute('data-upload-date');
     const fileSize = thumbnail.getAttribute('data-file-size');
     
-    DOM.previewImage.src = imageUrl;
-    DOM.imagePreviewTitle.textContent = fileName;
-    DOM.imageFileName.textContent = `檔案名稱: ${fileName}`;
-    DOM.imageUploadDate.textContent = `上傳時間: ${formatDateTime(uploadDate)}`;
-    DOM.imageFileSize.textContent = `檔案大小: ${formatFileSize(fileSize)}`;
-    DOM.downloadImageBtn.href = imageUrl;
-    DOM.downloadImageBtn.download = fileName;
+    if (DOM.previewImage) DOM.previewImage.src = imageUrl;
+    if (DOM.imagePreviewTitle) DOM.imagePreviewTitle.textContent = fileName;
+    if (DOM.imageFileName) DOM.imageFileName.textContent = `檔案名稱: ${fileName}`;
+    if (DOM.imageUploadDate) DOM.imageUploadDate.textContent = `上傳時間: ${formatDateTime(uploadDate)}`;
+    if (DOM.imageFileSize) DOM.imageFileSize.textContent = `檔案大小: ${formatFileSize(fileSize)}`;
+    if (DOM.downloadImageBtn) {
+        DOM.downloadImageBtn.href = imageUrl;
+        DOM.downloadImageBtn.download = fileName;
+    }
     
-    DOM.imagePreviewModal.classList.add('active');
+    if (DOM.imagePreviewModal) {
+        DOM.imagePreviewModal.classList.add('active');
+    }
 }
 
 // 工具函數
