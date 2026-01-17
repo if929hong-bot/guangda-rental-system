@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initAdminPage();
     loadBankInfo();
     loadAllTenants();
+    loadAllPayments();
     loadAllImages();
 });
 
@@ -72,6 +73,9 @@ function switchTab(tabName) {
     switch(tabName) {
         case 'tenants':
             loadAllTenants();
+            break;
+        case 'payments':
+            loadAllPayments();
             break;
         case 'images':
             loadAllImages();
@@ -187,6 +191,9 @@ async function loadAllTenants() {
         
         // 更新表格
         updateTenantsTable(tenants);
+        
+        // 更新繳費記錄頁面的租客篩選器
+        updateTenantFilter(tenants);
     } catch (error) {
         console.error('載入租客列表失敗:', error);
         if (loadingEl) loadingEl.style.display = 'none';
@@ -215,9 +222,6 @@ function updateTenantsTable(tenants) {
                 <td>${formatDate(tenant.created_at, true)}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="action-btn action-btn-payment" onclick="viewPaymentRecords(${tenant.id}, '${escapeHtml(tenant.name || tenant.username)}')">
-                            <i class="fas fa-money-bill-wave"></i> 繳費記錄
-                        </button>
                         <button class="action-btn action-btn-delete" onclick="deleteTenant(${tenant.id}, '${escapeHtml(tenant.name || tenant.username)}')">
                             <i class="fas fa-trash"></i> 刪除
                         </button>
@@ -230,87 +234,198 @@ function updateTenantsTable(tenants) {
     tableBody.innerHTML = html;
 }
 
-// 查看租客繳費記錄
-async function viewPaymentRecords(tenantId, tenantName) {
+// 更新租客篩選器
+function updateTenantFilter(tenants) {
+    const tenantFilter = document.getElementById('tenantFilter');
+    if (!tenantFilter) return;
+    
+    // 保存當前選擇的值
+    const currentValue = tenantFilter.value;
+    
+    // 清空選項（保留「全部租客」選項）
+    while (tenantFilter.options.length > 1) {
+        tenantFilter.remove(1);
+    }
+    
+    // 添加租客選項
+    tenants.forEach(tenant => {
+        const option = document.createElement('option');
+        option.value = tenant.id;
+        option.textContent = `${tenant.name || tenant.username} (${tenant.room_number || '--'})`;
+        tenantFilter.appendChild(option);
+    });
+    
+    // 恢復之前選擇的值
+    if (currentValue && currentValue !== 'all') {
+        tenantFilter.value = currentValue;
+    }
+}
+
+// 載入所有繳費記錄
+async function loadAllPayments() {
+    const loadingEl = document.getElementById('paymentsLoading');
+    const emptyEl = document.getElementById('paymentsEmpty');
+    const tableBody = document.querySelector('#paymentsTable tbody');
+    
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="loading">載入中...</td></tr>';
+    
     try {
-        showAlert('載入繳費記錄中...', 'info');
-        
-        const response = await api.adminApi.getTenantPayments(tenantId);
+        // 使用 adminApi.getAllPayments() 來取得所有繳費記錄
+        const response = await api.adminApi.getAllPayments();
         const payments = response.payments || [];
         
+        if (loadingEl) loadingEl.style.display = 'none';
+        
         if (payments.length === 0) {
-            showAlert(`${tenantName} 暫無繳費記錄`, 'info');
+            if (tableBody) tableBody.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'block';
+            updatePaymentStats(payments);
             return;
         }
         
-        // 建立繳費記錄彈跳窗
-        const modalHtml = `
-            <div class="modal active" id="paymentRecordsModal">
-                <div class="modal-content" style="max-width: 800px;">
-                    <div class="modal-header">
-                        <h3><i class="fas fa-money-bill-wave"></i> ${tenantName} 的繳費記錄</h3>
-                        <button class="modal-close" onclick="closeModal('paymentRecordsModal')">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div style="overflow-x: auto;">
-                            <table class="data-table" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th>繳費日期</th>
-                                        <th>房租</th>
-                                        <th>水費</th>
-                                        <th>電費(元/度)</th>
-                                        <th>上期電表</th>
-                                        <th>本期電表</th>
-                                        <th>用電度數</th>
-                                        <th>總金額</th>
-                                        <th>帳號後五碼</th>
-                                        <th>狀態</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${payments.map(payment => {
-                                        const electricityUsage = payment.current_meter - payment.previous_meter;
-                                        return `
-                                            <tr>
-                                                <td>${formatDate(payment.payment_date || payment.created_at)}</td>
-                                                <td>NT$ ${parseFloat(payment.rent_amount).toLocaleString()}</td>
-                                                <td>${payment.water_fee ? `NT$ ${parseFloat(payment.water_fee).toLocaleString()}` : '0'}</td>
-                                                <td>${parseFloat(payment.electricity_rate).toLocaleString()}</td>
-                                                <td>${payment.previous_meter.toLocaleString()}</td>
-                                                <td>${payment.current_meter.toLocaleString()}</td>
-                                                <td>${electricityUsage.toLocaleString()}</td>
-                                                <td>NT$ ${parseFloat(payment.total_amount).toLocaleString()}</td>
-                                                <td>${payment.account_last_five || 'N/A'}</td>
-                                                <td><span class="status-badge ${payment.status}">${payment.status === 'confirmed' ? '已確認' : '待確認'}</span></td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div style="margin-top: 20px; text-align: center;">
-                            <p><strong>總計：${payments.length} 筆記錄，總金額：NT$ ${payments.reduce((sum, payment) => sum + parseFloat(payment.total_amount || 0), 0).toLocaleString()}</strong></p>
-                        </div>
-                    </div>
-                    <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eee; text-align: right;">
-                        <button class="btn btn-secondary" onclick="closeModal('paymentRecordsModal')">關閉</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        // 取得篩選條件
+        const statusFilter = document.getElementById('statusFilter').value;
+        const tenantFilter = document.getElementById('tenantFilter').value;
         
-        // 移除現有的彈跳窗
-        const existingModal = document.getElementById('paymentRecordsModal');
-        if (existingModal) existingModal.remove();
+        // 篩選繳費記錄
+        let filteredPayments = payments;
         
-        // 添加新的彈跳窗
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        if (statusFilter !== 'all') {
+            filteredPayments = filteredPayments.filter(payment => payment.status === statusFilter);
+        }
         
-        showAlert('繳費記錄載入成功', 'success');
+        if (tenantFilter !== 'all') {
+            filteredPayments = filteredPayments.filter(payment => payment.user_id == tenantFilter);
+        }
+        
+        // 更新表格
+        updatePaymentsTable(filteredPayments);
+        
+        // 更新統計資訊
+        updatePaymentStats(payments);
+        
     } catch (error) {
         console.error('載入繳費記錄失敗:', error);
-        showAlert('無法載入繳費記錄: ' + (error.message || '請稍後再試'), 'error');
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="error">載入失敗，請刷新頁面</td></tr>';
+        showAlert('無法載入繳費記錄: ' + (error.message || '請檢查網路連接'), 'error');
+    }
+}
+
+// 更新繳費記錄表格
+function updatePaymentsTable(payments) {
+    const tableBody = document.querySelector('#paymentsTable tbody');
+    
+    if (!tableBody) return;
+    
+    if (payments.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="13" class="empty-state">暫無繳費記錄</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    // 取得租客資訊（為了顯示租客名稱）
+    const tenants = [];
+    try {
+        // 嘗試從本地儲存或先前載入的資料取得租客資訊
+        const tenantsResponse = localStorage.getItem('adminTenants');
+        if (tenantsResponse) {
+            const parsed = JSON.parse(tenantsResponse);
+            tenants.push(...(parsed.tenants || []));
+        }
+    } catch (e) {
+        console.error('取得租客資訊失敗:', e);
+    }
+    
+    payments.forEach(payment => {
+        const electricityUsage = payment.current_meter - payment.previous_meter;
+        const electricityFee = electricityUsage * payment.electricity_rate;
+        
+        // 尋找對應的租客資訊
+        const tenant = tenants.find(t => t.id == payment.user_id) || {};
+        
+        html += `
+            <tr>
+                <td>${escapeHtml(tenant.name || tenant.username || payment.username || '租客')}</td>
+                <td>${escapeHtml(tenant.room_number || '--')}</td>
+                <td>${formatDate(payment.payment_date || payment.created_at)}</td>
+                <td>NT$ ${parseFloat(payment.rent_amount).toLocaleString()}</td>
+                <td>${payment.water_fee ? `NT$ ${parseFloat(payment.water_fee).toLocaleString()}` : '0'}</td>
+                <td>${parseFloat(payment.electricity_rate).toLocaleString()}</td>
+                <td>${payment.previous_meter.toLocaleString()}</td>
+                <td>${payment.current_meter.toLocaleString()}</td>
+                <td>${electricityUsage.toLocaleString()}</td>
+                <td>NT$ ${parseFloat(payment.total_amount).toLocaleString()}</td>
+                <td>${payment.account_last_five || 'N/A'}</td>
+                <td>
+                    <span class="status-badge status-${payment.status}">
+                        ${payment.status === 'confirmed' ? '已確認' : '待確認'}
+                    </span>
+                </td>
+                <td>
+                    <div class="action-btns">
+                        ${payment.status !== 'confirmed' ? `
+                            <button class="action-btn action-btn-confirm" onclick="confirmPayment(${payment.id})">
+                                <i class="fas fa-check"></i> 確認
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableBody.innerHTML = html;
+}
+
+// 更新繳費統計資訊
+function updatePaymentStats(payments) {
+    if (!payments || payments.length === 0) {
+        document.getElementById('totalPayments').textContent = '0';
+        document.getElementById('pendingPayments').textContent = '0';
+        document.getElementById('confirmedPayments').textContent = '0';
+        document.getElementById('totalAmount').textContent = 'NT$ 0';
+        return;
+    }
+    
+    const totalPayments = payments.length;
+    const pendingPayments = payments.filter(p => p.status === 'pending').length;
+    const confirmedPayments = payments.filter(p => p.status === 'confirmed').length;
+    const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.total_amount || 0), 0);
+    
+    document.getElementById('totalPayments').textContent = totalPayments.toLocaleString();
+    document.getElementById('pendingPayments').textContent = pendingPayments.toLocaleString();
+    document.getElementById('confirmedPayments').textContent = confirmedPayments.toLocaleString();
+    document.getElementById('totalAmount').textContent = `NT$ ${totalAmount.toLocaleString()}`;
+}
+
+// 確認繳費記錄
+async function confirmPayment(paymentId) {
+    try {
+        showAlert('確認中...', 'info');
+        
+        const response = await api.paymentApi.updatePaymentStatus(paymentId, 'confirmed');
+        
+        if (response.success) {
+            showAlert('繳費記錄已確認', 'success');
+            
+            // 重新載入繳費記錄
+            setTimeout(() => {
+                loadAllPayments();
+            }, 1000);
+        } else {
+            showAlert(response.message || '確認失敗', 'error');
+        }
+    } catch (error) {
+        console.error('確認繳費記錄失敗:', error);
+        showAlert('確認失敗: ' + (error.message || '請稍後再試'), 'error');
     }
 }
 
@@ -332,6 +447,7 @@ async function deleteTenant(tenantId, tenantName) {
             // 重新載入租客列表
             setTimeout(() => {
                 loadAllTenants();
+                loadAllPayments(); // 重新載入繳費記錄，因為可能刪除了相關記錄
             }, 1000);
         } else {
             showAlert(response.message || '刪除失敗', 'error');
@@ -559,6 +675,7 @@ window.loadBankInfo = loadBankInfo;
 window.saveBankInfo = saveBankInfo;
 window.previewImage = previewImage;
 window.downloadImage = downloadImage;
-window.viewPaymentRecords = viewPaymentRecords;
+window.confirmPayment = confirmPayment;
 window.deleteTenant = deleteTenant;
+window.loadAllPayments = loadAllPayments;
 window.closeModal = closeModal;
