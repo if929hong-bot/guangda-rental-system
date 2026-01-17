@@ -12,10 +12,20 @@
         <div class="login-box">
             <div class="login-header">
                 <h1><i class="fas fa-sign-in-alt"></i> 登入系統</h1>
-                <p id="role-title">租客登入</p>
+                <p id="role-title">請選擇登入身分</p>
             </div>
 
             <form id="loginForm" class="login-form">
+                <!-- 添加角色選擇下拉選單 -->
+                <div class="form-group">
+                    <label for="role"><i class="fas fa-user-tag"></i> 登入身分</label>
+                    <select id="role" name="role" class="form-control" required>
+                        <option value="">請選擇身分</option>
+                        <option value="tenant">租客</option>
+                        <option value="admin">管理員</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label for="username"><i class="fas fa-user"></i> 用戶名稱</label>
                     <input type="text" id="username" name="username" required 
@@ -41,21 +51,66 @@
     </div>
 
     <script>
-        // 根據 URL 參數顯示不同的登入類型
+        // 根據 URL 參數設定預設角色
         const urlParams = new URLSearchParams(window.location.search);
-        const role = urlParams.get('role') || 'tenant';
+        const urlRole = urlParams.get('role') || '';
         
-        document.getElementById('role-title').textContent = 
-            role === 'admin' ? '管理員登入' : '租客登入';
+        // 如果有 URL 參數，設定預設角色
+        if (urlRole) {
+            document.getElementById('role').value = urlRole;
+            updateRoleTitle();
+        }
+        
+        // 更新角色標題
+        function updateRoleTitle() {
+            const role = document.getElementById('role').value;
+            const roleTitle = document.getElementById('role-title');
+            
+            if (role === 'admin') {
+                roleTitle.textContent = '管理員登入';
+            } else if (role === 'tenant') {
+                roleTitle.textContent = '租客登入';
+            } else {
+                roleTitle.textContent = '請選擇登入身分';
+            }
+        }
+        
+        // 當角色改變時更新標題
+        document.getElementById('role').addEventListener('change', updateRoleTitle);
+        
+        // 初始化標題
+        updateRoleTitle();
         
         // 處理登入表單
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const role = document.getElementById('role').value;
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
-            // 這裡呼叫 API 進行登入驗證
+            // 驗證輸入
+            if (!role) {
+                alert('請選擇登入身分');
+                return;
+            }
+            
+            if (!username) {
+                alert('請輸入用戶名稱');
+                return;
+            }
+            
+            if (!password) {
+                alert('請輸入密碼');
+                return;
+            }
+            
+            // 顯示載入中
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 登入中...';
+            
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
@@ -76,6 +131,9 @@
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     
+                    // 顯示成功訊息
+                    alert('登入成功！');
+                    
                     // 根據角色跳轉到不同頁面
                     if (role === 'admin') {
                         window.location.href = 'admin.html';
@@ -84,10 +142,30 @@
                     }
                 } else {
                     alert('登入失敗：' + data.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
                 }
             } catch (error) {
                 console.error('登入錯誤:', error);
-                alert('登入時發生錯誤');
+                alert('登入時發生錯誤，請檢查網路連接');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+        
+        // 自動填入管理員帳號（方便測試）
+        window.addEventListener('load', function() {
+            // 檢查是否是管理員角色
+            const roleSelect = document.getElementById('role');
+            const urlRole = new URLSearchParams(window.location.search).get('role');
+            
+            if (urlRole === 'admin') {
+                roleSelect.value = 'admin';
+                updateRoleTitle();
+                
+                // 自動填入預設管理員帳號（方便測試）
+                document.getElementById('username').value = '0975521219';
+                document.getElementById('password').value = 'gdc0975521219';
             }
         });
     </script>

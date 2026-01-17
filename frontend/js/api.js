@@ -1,156 +1,216 @@
-// frontend/js/api.js - 修复版
-// API 基礎設定 - 如果是開發環境使用本地，上線使用 Railway 網址
-const API_BASE_URL = window.location.origin; // 自動偵測當前網域
-
-// 從 localStorage 取得 token
-function getToken() {
-    return localStorage.getItem('token');
-}
-
-// 檢查是否登入
-function checkAuth() {
-    const token = getToken();
-    if (!token) {
-        window.location.href = 'index.html';
-        return false;
-    }
-    return true;
-}
-
-// 取得使用者資訊
-function getUserInfo() {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-}
-
-// 通用 API 請求函數
-async function apiRequest(endpoint, method = 'GET', data = null) {
-    const url = `${API_BASE_URL}/api${endpoint}`;
-    const token = getToken();
-    
-    const headers = {
-        'Content-Type': 'application/json',
-    };
-    
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    const options = {
-        method,
-        headers,
-    };
-    
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-        options.body = JSON.stringify(data);
-    }
-    
-    try {
-        const response = await fetch(url, options);
-        
-        if (response.status === 401) {
-            // Token 失效，跳轉到登入頁面
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = 'index.html';
-            throw new Error('請重新登入');
-        }
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.message || '請求失敗');
-        }
-        
-        return result;
-    } catch (error) {
-        console.error('API 請求錯誤:', error);
-        throw error;
-    }
-}
-
-// 使用者相關 API
-const userApi = {
-    // 登入
-    login: (username, password, role) => 
-        apiRequest('/login', 'POST', { username, password, role }),
-    
-    // 註冊
-    register: (userData) => 
-        apiRequest('/register', 'POST', userData),
-    
-    // 取得使用者資料
-    getProfile: () => 
-        apiRequest('/profile'),
-    
-    // 登出
-    logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-    }
-};
-
-// 銀行資訊相關 API
-const bankApi = {
-    // 取得銀行資訊 (租客用)
-    getBankInfo: () => 
-        apiRequest('/bank-info'),
-    
-    // 更新銀行資訊 (管理員用)
-    updateBankInfo: (bankData) => 
-        apiRequest('/bank-info', 'PUT', bankData)
-};
-
-// 繳費記錄相關 API
-const paymentApi = {
-    // 取得租客的繳費記錄
-    getPayments: () => 
-        apiRequest('/payments'),
-    
-    // 新增繳費記錄
-    createPayment: (paymentData) => 
-        apiRequest('/payments', 'POST', paymentData)
-};
-
-// 圖片相關 API
-const imageApi = {
-    // 取得圖片列表
-    getImages: () => 
-        apiRequest('/images'),
-    
-    // 取得 Cloudflare R2 上傳 URL
-    getUploadUrl: () => 
-        apiRequest('/images/upload-url', 'POST'),
-    
-    // 儲存圖片資訊
-    saveImageInfo: (imageData) => 
-        apiRequest('/images/save', 'POST', imageData)
-};
-
-// 管理員相關 API
-const adminApi = {
-    // 取得所有租客資料
-    getAllTenants: () => 
-        apiRequest('/admin/tenants')
-};
-
-// 匯出所有 API
+// API 基礎設定
 const api = {
-    userApi,
-    bankApi,
-    paymentApi,
-    imageApi,
-    adminApi,
-    checkAuth,
-    getUserInfo,
-    getToken
+    // API 基礎 URL
+    baseUrl: window.location.origin,
+    
+    // 取得 token
+    getToken() {
+        return localStorage.getItem('token');
+    },
+    
+    // 儲存 token
+    setToken(token) {
+        localStorage.setItem('token', token);
+    },
+    
+    // 移除 token
+    removeToken() {
+        localStorage.removeItem('token');
+    },
+    
+    // 取得使用者資訊
+    getUserInfo() {
+        const userJson = localStorage.getItem('user');
+        return userJson ? JSON.parse(userJson) : null;
+    },
+    
+    // 儲存使用者資訊
+    setUserInfo(user) {
+        localStorage.setItem('user', JSON.stringify(user));
+    },
+    
+    // 移除使用者資訊
+    removeUserInfo() {
+        localStorage.removeItem('user');
+    },
+    
+    // 檢查是否已登入
+    checkAuth() {
+        return !!this.getToken();
+    },
+    
+    // 通用請求函數
+    async request(endpoint, options = {}) {
+        const url = `${this.baseUrl}${endpoint}`;
+        const token = this.getToken();
+        
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
+        
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers
+            });
+            
+            // 處理非 JSON 響應
+            const contentType = response.headers.get('content-type');
+            let data;
+            
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`非JSON響應: ${text.substring(0, 100)}`);
+            }
+            
+            if (!response.ok) {
+                // 如果 token 過期或無效，導向登入頁面
+                if (response.status === 401 || response.status === 403) {
+                    this.removeToken();
+                    this.removeUserInfo();
+                    window.location.href = 'login.html';
+                }
+                
+                throw new Error(data.message || `HTTP ${response.status}`);
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API 請求失敗:', error);
+            throw error;
+        }
+    },
+    
+    // 使用者 API
+    userApi: {
+        async login(username, password, role) {
+            const response = await api.request('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password, role })
+            });
+            
+            if (response.success && response.token) {
+                api.setToken(response.token);
+                api.setUserInfo(response.user);
+            }
+            
+            return response;
+        },
+        
+        async register(userData) {
+            return await api.request('/api/register', {
+                method: 'POST',
+                body: JSON.stringify(userData)
+            });
+        },
+        
+        logout() {
+            api.removeToken();
+            api.removeUserInfo();
+        }
+    },
+    
+    // 銀行資訊 API
+    bankApi: {
+        async getBankInfo() {
+            return await api.request('/api/bank-info');
+        },
+        
+        async updateBankInfo(bankData) {
+            return await api.request('/api/bank-info', {
+                method: 'PUT',
+                body: JSON.stringify(bankData)
+            });
+        }
+    },
+    
+    // 繳費記錄 API
+    paymentApi: {
+        async getPayments() {
+            return await api.request('/api/payments');
+        },
+        
+        async createPayment(paymentData) {
+            return await api.request('/api/payments', {
+                method: 'POST',
+                body: JSON.stringify(paymentData)
+            });
+        },
+        
+        async updatePaymentStatus(paymentId, status) {
+            return await api.request(`/api/payments/${paymentId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status })
+            });
+        }
+    },
+    
+    // 圖片 API
+    imageApi: {
+        async getImages() {
+            return await api.request('/api/images');
+        },
+        
+        async uploadImage(formData) {
+            const token = api.getToken();
+            const response = await fetch(`${api.baseUrl}/api/images/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            return await response.json();
+        },
+        
+        async deleteImage(imageId) {
+            return await api.request(`/api/images/${imageId}`, {
+                method: 'DELETE'
+            });
+        }
+    },
+    
+    // 管理員 API
+    adminApi: {
+        async getAllTenants() {
+            return await api.request('/api/admin/tenants');
+        },
+        
+        // 新增：刪除租客
+        async deleteTenant(tenantId) {
+            return await api.request(`/api/admin/tenants/${tenantId}`, {
+                method: 'DELETE'
+            });
+        },
+        
+        async getAllPayments() {
+            return await api.request('/api/payments'); // 管理員會收到所有繳費記錄
+        },
+        
+        async getAllImages() {
+            return await api.request('/api/images'); // 管理員會收到所有圖片
+        },
+        
+        async getDashboard() {
+            return await api.request('/api/admin/dashboard');
+        }
+    },
+    
+    // 個人資料 API
+    profileApi: {
+        async getProfile() {
+            return await api.request('/api/profile');
+        }
+    }
 };
 
-// 全局導出，兼容 CommonJS 和 ES6 模塊
-if (typeof module !== 'undefined' && module.exports) {
-    // CommonJS
-    module.exports = api;
-} else {
-    // 瀏覽器環境
-    window.api = api;
-}
+// 使 api 物件在全局可用
+window.api = api;

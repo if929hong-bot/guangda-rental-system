@@ -5,29 +5,81 @@ const jwt = require('jsonwebtoken');
 const mysql = require('mysql2/promise');
 const AWS = require('aws-sdk');
 const path = require('path');
+const multer = require('multer'); // 新增 multer 處理檔案上傳
 require('dotenv').config();
 
 const app = express();
 
-// 重要：Railway 会自动设置 PORT 环境变量
+// 重要：Railway 會自動設置 PORT 環境變數
 const PORT = process.env.PORT || 3000;
 
-// 调试信息
-console.log('========== 环境信息 ==========');
+// 除錯資訊
+console.log('========== 環境資訊 ==========');
 console.log('PORT:', PORT);
 console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('当前目录:', __dirname);
+console.log('當前目錄:', __dirname);
 console.log('==============================');
 
 // 中介軟體
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // 新增：支援表單數據
 
-// 获取项目根目录路径（server.js 在 backend/ 目录中）
+// 配置 multer 用於本地檔案上傳
+const storage = multer.memoryStorage(); // 使用記憶體儲存，可改為磁碟儲存
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB 限制
+        files: 5 // 最多5個檔案
+    },
+    fileFilter: (req, file, cb) => {
+        // 允許的檔案類型
+        const allowedTypes = /jpeg|jpg|png|gif|pdf/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('只允許上傳圖片檔案 (JPEG, JPG, PNG, GIF) 和 PDF'));
+        }
+    }
+});
+
+// 獲取項目根目錄路徑（server.js 在 backend/ 目錄中）
 const projectRoot = path.join(__dirname, '..');
 
-// 提供前端靜態檔案
+// ========== 靜態檔案服務設定 ==========
+// 提供前端靜態檔案 - 確保路徑正確
 app.use(express.static(path.join(projectRoot, 'frontend')));
+
+// 提供 CSS 檔案（確保正確路徑）
+app.use('/css', express.static(path.join(projectRoot, 'frontend', 'css')));
+
+// 提供 JS 檔案（確保正確路徑）
+app.use('/js', express.static(path.join(projectRoot, 'frontend', 'js')));
+
+// 修正前端頁面路由（確保能正確訪問HTML檔案）
+app.get('/', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'index.html'));
+});
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'admin.html'));
+});
+
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'login.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'register.html'));
+});
+
+app.get('/tenant', (req, res) => {
+    res.sendFile(path.join(projectRoot, 'frontend', 'tenant.html'));
+});
 
 // JWT 密鑰
 const JWT_SECRET = process.env.JWT_SECRET || 'guangda-rental-secret-key';
@@ -50,28 +102,36 @@ try {
 }
 
 // Cloudflare R2 設定
-const s3 = new AWS.S3({
-    endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    accessKeyId: process.env.CF_ACCESS_KEY_ID,
-    secretAccessKey: process.env.CF_SECRET_ACCESS_KEY,
-    signatureVersion: 'v4',
-    region: 'auto'
-});
+let s3 = null;
+let CF_BUCKET_NAME = '';
+let CF_PUBLIC_DOMAIN = '';
 
-const CF_BUCKET_NAME = process.env.CF_BUCKET_NAME || 'guangda-rental-images';
-const CF_PUBLIC_DOMAIN = process.env.CF_PUBLIC_DOMAIN || 'pub-xxx.r2.dev';
+if (process.env.CF_ACCOUNT_ID && process.env.CF_ACCESS_KEY_ID) {
+    s3 = new AWS.S3({
+        endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        accessKeyId: process.env.CF_ACCESS_KEY_ID,
+        secretAccessKey: process.env.CF_SECRET_ACCESS_KEY,
+        signatureVersion: 'v4',
+        region: 'auto'
+    });
+    
+    CF_BUCKET_NAME = process.env.CF_BUCKET_NAME || 'guangda-rental-images';
+    CF_PUBLIC_DOMAIN = process.env.CF_PUBLIC_DOMAIN || 'pub-xxx.r2.dev';
+    console.log('Cloudflare R2 設定完成');
+} else {
+    console.log('Cloudflare R2 未設定，使用本地儲存');
+}
 
-// ========== 全局数据存储 ==========
-// 为了数据持久化，我们将数据存储在文件中
+// ========== 全域資料儲存 ==========
 const fs = require('fs');
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// 初始化或加载数据
+// 初始化或加載資料
 let sharedData = {
-    payments: [],      // 所有缴费记录
-    images: [],        // 所有图片
-    tenants: [],       // 所有租客
-    bankInfo: {        // 银行信息
+    payments: [],
+    images: [],
+    tenants: [],
+    bankInfo: {
         bank_name: '元大銀行',
         branch_name: '營業部',
         account_name: '廣大城',
@@ -80,43 +140,56 @@ let sharedData = {
     }
 };
 
-// 尝试从文件加载数据
-try {
-    if (fs.existsSync(DATA_FILE)) {
-        const data = fs.readFileSync(DATA_FILE, 'utf8');
-        sharedData = JSON.parse(data);
-        console.log('数据已从文件加载');
-    } else {
-        // 初始化测试数据
-        sharedData.tenants.push({
-            id: 2,
-            username: 'tenant',
-            name: '測試租客',
-            email: 'tenant@example.com',
-            phone: '0911111111',
-            room_number: '101',
-            lease_start: '2024-01-01',
-            lease_end: '2024-12-31',
-            rent_amount: '15000',
-            role: 'tenant',
-            created_at: new Date().toISOString()
-        });
-        saveData();
-        console.log('测试数据已初始化');
-    }
-} catch (error) {
-    console.error('加载数据文件失败:', error);
+// 初始化資料夾
+const UPLOADS_DIR = path.join(projectRoot, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    console.log('上傳資料夾已建立:', UPLOADS_DIR);
 }
 
-// 保存数据到文件
+// 嘗試從檔案加載資料
+function loadData() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const data = fs.readFileSync(DATA_FILE, 'utf8');
+            sharedData = JSON.parse(data);
+            console.log('資料已從檔案加載');
+        } else {
+            // 初始化測試資料
+            sharedData.tenants.push({
+                id: 2,
+                username: 'tenant',
+                password: '123456',
+                name: '測試租客',
+                email: 'tenant@example.com',
+                phone: '0911111111',
+                room_number: '101',
+                lease_start: '2024-01-01',
+                lease_end: '2024-12-31',
+                rent_amount: '15000',
+                role: 'tenant',
+                created_at: new Date().toISOString()
+            });
+            saveData();
+            console.log('測試資料已初始化');
+        }
+    } catch (error) {
+        console.error('加載資料檔案失敗:', error);
+    }
+}
+
+// 儲存資料到檔案
 function saveData() {
     try {
         fs.writeFileSync(DATA_FILE, JSON.stringify(sharedData, null, 2));
-        console.log('数据已保存到文件');
+        console.log('資料已儲存到檔案');
     } catch (error) {
-        console.error('保存数据失败:', error);
+        console.error('儲存資料失敗:', error);
     }
 }
+
+// 初始化載入資料
+loadData();
 
 // 驗證 Token 中介軟體
 async function authenticateToken(req, res, next) {
@@ -146,66 +219,30 @@ function checkAdmin(req, res, next) {
 
 // ========== API 路由 ==========
 
-// 1. 健康检查
+// 1. 健康檢查
 app.get('/health', (req, res) => {
-    console.log('根路径健康检查被调用');
+    console.log('根路徑健康檢查被調用');
     res.status(200).send('OK');
 });
 
-// 2. 首页路由
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>廣大城租客管理系統</title>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                h1 { color: #2c3e50; }
-                .status { color: green; font-weight: bold; }
-                .links { margin-top: 30px; }
-                .links a { display: inline-block; margin: 10px; padding: 10px 20px; 
-                           background: #3498db; color: white; text-decoration: none; 
-                           border-radius: 5px; }
-                .links a:hover { background: #2980b9; }
-            </style>
-        </head>
-        <body>
-            <h1>廣大城租客管理系統</h1>
-            <p class="status">✅ 伺服器運行正常</p>
-            <p>時間：${new Date().toLocaleString('zh-TW')}</p>
-            <div class="links">
-                <a href="/login.html">租客登入</a>
-                <a href="/admin.html">管理員登入</a>
-                <a href="/register.html">註冊帳號</a>
-                <a href="/api/health">系統狀態</a>
-            </div>
-        </body>
-        </html>
-    `);
+// 2. API 健康檢查
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: '系統運作正常',
+        timestamp: new Date().toISOString(),
+        dataCounts: {
+            tenants: sharedData.tenants.length,
+            payments: sharedData.payments.length,
+            images: sharedData.images.length,
+            bankInfo: 1
+        }
+    });
 });
 
-// 3. 前端页面路由
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(projectRoot, 'frontend', 'login.html'));
-});
+// ========== 使用者認證 API ==========
 
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(projectRoot, 'frontend', 'admin.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(projectRoot, 'frontend', 'register.html'));
-});
-
-app.get('/tenant', (req, res) => {
-    res.sendFile(path.join(projectRoot, 'frontend', 'tenant.html'));
-});
-
-// ========== 用户认证 API ==========
-
-// 4. 登入 API
+// 3. 登入 API
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password, role } = req.body;
@@ -288,10 +325,13 @@ app.post('/api/login', async (req, res) => {
                     { expiresIn: '24h' }
                 );
                 
+                // 不返回密碼
+                const { password: _, ...userWithoutPassword } = tenant;
+                
                 return res.json({
                     success: true,
                     token,
-                    user: tenant
+                    user: userWithoutPassword
                 });
             }
         }
@@ -309,7 +349,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 5. 註冊 API
+// 4. 註冊 API
 app.post('/api/register', async (req, res) => {
     try {
         const { 
@@ -324,19 +364,19 @@ app.post('/api/register', async (req, res) => {
             rent_amount 
         } = req.body;
         
-        // 檢查用戶名是否已存在
+        // 檢查使用者名稱是否已存在
         if (sharedData.tenants.some(t => t.username === username)) {
             return res.status(400).json({
                 success: false,
-                message: '用戶名已存在'
+                message: '使用者名稱已存在'
             });
         }
         
-        // 創建新用戶
+        // 創建新使用者
         const newUser = {
             id: Date.now(),
             username,
-            password, // 注意：實際應用中應該加密儲存
+            password,
             name,
             room_number,
             email,
@@ -357,7 +397,8 @@ app.post('/api/register', async (req, res) => {
             { 
                 id: newUser.id, 
                 username: newUser.username, 
-                role: newUser.role 
+                role: newUser.role,
+                name: newUser.name
             },
             JWT_SECRET,
             { expiresIn: '24h' }
@@ -383,7 +424,7 @@ app.post('/api/register', async (req, res) => {
 
 // ========== 銀行資訊 API ==========
 
-// 6. 取得銀行資訊（租客和管理員都能用）
+// 5. 取得銀行資訊（租客和管理員都能用）
 app.get('/api/bank-info', authenticateToken, async (req, res) => {
     try {
         res.json({
@@ -399,7 +440,7 @@ app.get('/api/bank-info', authenticateToken, async (req, res) => {
     }
 });
 
-// 7. 更新銀行資訊（僅管理員）
+// 6. 更新銀行資訊（僅管理員）
 app.put('/api/bank-info', authenticateToken, checkAdmin, async (req, res) => {
     try {
         const { bank_name, branch_name, account_name, account_number } = req.body;
@@ -430,7 +471,7 @@ app.put('/api/bank-info', authenticateToken, checkAdmin, async (req, res) => {
 
 // ========== 繳費記錄 API ==========
 
-// 8. 取得繳費記錄
+// 7. 取得繳費記錄
 app.get('/api/payments', authenticateToken, async (req, res) => {
     try {
         let userPayments;
@@ -442,6 +483,9 @@ app.get('/api/payments', authenticateToken, async (req, res) => {
             // 租客只能看到自己的繳費記錄
             userPayments = sharedData.payments.filter(p => p.tenant_id === req.user.id);
         }
+        
+        // 按日期排序，最新的在前
+        userPayments.sort((a, b) => new Date(b.payment_date || b.created_at) - new Date(a.payment_date || a.created_at));
         
         res.json({
             success: true,
@@ -456,7 +500,7 @@ app.get('/api/payments', authenticateToken, async (req, res) => {
     }
 });
 
-// 9. 新增繳費記錄
+// 8. 新增繳費記錄
 app.post('/api/payments', authenticateToken, async (req, res) => {
     try {
         const {
@@ -470,20 +514,28 @@ app.post('/api/payments', authenticateToken, async (req, res) => {
             account_last_five
         } = req.body;
         
+        // 計算用電度數和電費
+        const electricity_usage = current_meter - previous_meter;
+        const electricity_fee = electricity_usage * electricity_rate;
+        const calculated_total = parseFloat(rent_amount) + parseFloat(water_fee || 0) + electricity_fee;
+        
         const newPayment = {
             id: sharedData.payments.length + 1,
             tenant_id: req.user.id,
             tenant_name: req.user.name || req.user.username,
             payment_date,
-            rent_amount,
-            water_fee: water_fee || 0,
-            electricity_rate,
-            previous_meter,
-            current_meter,
-            total_amount,
+            rent_amount: parseFloat(rent_amount),
+            water_fee: parseFloat(water_fee || 0),
+            electricity_rate: parseFloat(electricity_rate),
+            electricity_usage: electricity_usage,
+            electricity_fee: electricity_fee,
+            previous_meter: parseInt(previous_meter),
+            current_meter: parseInt(current_meter),
+            total_amount: parseFloat(total_amount || calculated_total),
             account_last_five,
             status: 'pending',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
         
         sharedData.payments.push(newPayment);
@@ -503,9 +555,43 @@ app.post('/api/payments', authenticateToken, async (req, res) => {
     }
 });
 
+// 8.1 更新繳費記錄狀態（管理員確認）
+app.put('/api/payments/:id', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const paymentId = parseInt(req.params.id);
+        const { status } = req.body;
+        
+        const paymentIndex = sharedData.payments.findIndex(p => p.id === paymentId);
+        
+        if (paymentIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: '繳費記錄不存在'
+            });
+        }
+        
+        // 更新狀態
+        sharedData.payments[paymentIndex].status = status;
+        sharedData.payments[paymentIndex].updated_at = new Date().toISOString();
+        saveData();
+        
+        res.json({
+            success: true,
+            message: '繳費記錄狀態已更新',
+            payment: sharedData.payments[paymentIndex]
+        });
+    } catch (error) {
+        console.error('更新繳費記錄錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '伺服器錯誤' 
+        });
+    }
+});
+
 // ========== 圖片上傳 API ==========
 
-// 10. 取得圖片列表
+// 9. 取得圖片列表
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
         let userImages;
@@ -517,6 +603,9 @@ app.get('/api/images', authenticateToken, async (req, res) => {
             // 租客只能看到自己的圖片
             userImages = sharedData.images.filter(img => img.tenant_id === req.user.id);
         }
+        
+        // 按上傳時間排序，最新的在前
+        userImages.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
         
         res.json({
             success: true,
@@ -531,44 +620,144 @@ app.get('/api/images', authenticateToken, async (req, res) => {
     }
 });
 
-// 11. 取得上傳簽章 URL
-app.post('/api/images/upload-url', authenticateToken, async (req, res) => {
+// 10. 本地圖片上傳（無需 Cloudflare R2）
+app.post('/api/images/upload', authenticateToken, upload.single('image'), async (req, res) => {
     try {
-        if (!process.env.CF_ACCOUNT_ID) {
-            return res.status(500).json({
+        if (!req.file) {
+            return res.status(400).json({
                 success: false,
-                message: 'Cloudflare R2 未設定'
+                message: '請選擇要上傳的圖片'
             });
         }
         
-        const fileName = `uploads/${req.user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const file = req.file;
+        const tenantId = req.user.id;
+        const tenantName = req.user.name || req.user.username;
         
-        const params = {
-            Bucket: CF_BUCKET_NAME,
-            Key: fileName,
-            Expires: 300,
-            ContentType: 'image/*'
+        // 建立租客專屬資料夾
+        const tenantUploadDir = path.join(UPLOADS_DIR, String(tenantId));
+        if (!fs.existsSync(tenantUploadDir)) {
+            fs.mkdirSync(tenantUploadDir, { recursive: true });
+        }
+        
+        // 產生唯一的檔案名稱
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        const fileExt = path.extname(file.originalname);
+        const fileName = `${timestamp}-${randomStr}${fileExt}`;
+        const filePath = path.join(tenantUploadDir, fileName);
+        
+        // 儲存檔案
+        fs.writeFileSync(filePath, file.buffer);
+        
+        // 產生公開 URL
+        const publicUrl = `/uploads/${tenantId}/${fileName}`;
+        
+        // 建立圖片資訊
+        const imageInfo = {
+            id: sharedData.images.length + 1,
+            tenant_id: tenantId,
+            tenant_name: tenantName,
+            image_url: publicUrl,
+            file_name: file.originalname,
+            file_size: file.size,
+            file_type: file.mimetype,
+            uploaded_at: new Date().toISOString()
         };
         
-        const uploadUrl = s3.getSignedUrl('putObject', params);
-        const publicUrl = `https://${CF_PUBLIC_DOMAIN}/${fileName}`;
+        // 儲存到共享資料
+        sharedData.images.push(imageInfo);
+        saveData();
+        
+        // 建立公開訪問路徑
+        app.use('/uploads', express.static(UPLOADS_DIR));
         
         res.json({
             success: true,
-            uploadUrl,
-            publicUrl,
-            fileName
+            message: '圖片上傳成功',
+            image: imageInfo
         });
     } catch (error) {
-        console.error('取得上傳 URL 錯誤:', error);
+        console.error('圖片上傳錯誤:', error);
         res.status(500).json({ 
             success: false, 
-            message: '伺服器錯誤' 
+            message: '圖片上傳失敗: ' + error.message 
         });
     }
 });
 
-// 12. 儲存圖片資訊
+// 10.1 多檔案上傳
+app.post('/api/images/upload-multiple', authenticateToken, upload.array('images', 5), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: '請選擇要上傳的圖片'
+            });
+        }
+        
+        const files = req.files;
+        const tenantId = req.user.id;
+        const tenantName = req.user.name || req.user.username;
+        const uploadedImages = [];
+        
+        // 建立租客專屬資料夾
+        const tenantUploadDir = path.join(UPLOADS_DIR, String(tenantId));
+        if (!fs.existsSync(tenantUploadDir)) {
+            fs.mkdirSync(tenantUploadDir, { recursive: true });
+        }
+        
+        for (const file of files) {
+            // 產生唯一的檔案名稱
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 10);
+            const fileExt = path.extname(file.originalname);
+            const fileName = `${timestamp}-${randomStr}${fileExt}`;
+            const filePath = path.join(tenantUploadDir, fileName);
+            
+            // 儲存檔案
+            fs.writeFileSync(filePath, file.buffer);
+            
+            // 產生公開 URL
+            const publicUrl = `/uploads/${tenantId}/${fileName}`;
+            
+            // 建立圖片資訊
+            const imageInfo = {
+                id: sharedData.images.length + 1,
+                tenant_id: tenantId,
+                tenant_name: tenantName,
+                image_url: publicUrl,
+                file_name: file.originalname,
+                file_size: file.size,
+                file_type: file.mimetype,
+                uploaded_at: new Date().toISOString()
+            };
+            
+            // 儲存到共享資料
+            sharedData.images.push(imageInfo);
+            uploadedImages.push(imageInfo);
+        }
+        
+        saveData();
+        
+        // 建立公開訪問路徑
+        app.use('/uploads', express.static(UPLOADS_DIR));
+        
+        res.json({
+            success: true,
+            message: `成功上傳 ${uploadedImages.length} 張圖片`,
+            images: uploadedImages
+        });
+    } catch (error) {
+        console.error('多檔案上傳錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '圖片上傳失敗: ' + error.message 
+        });
+    }
+});
+
+// 11. 儲存圖片資訊（用於 Cloudflare R2 上傳後）
 app.post('/api/images/save', authenticateToken, async (req, res) => {
     try {
         const { image_url, file_name, file_size } = req.body;
@@ -600,6 +789,59 @@ app.post('/api/images/save', authenticateToken, async (req, res) => {
     }
 });
 
+// 12. 刪除圖片
+app.delete('/api/images/:id', authenticateToken, async (req, res) => {
+    try {
+        const imageId = parseInt(req.params.id);
+        const imageIndex = sharedData.images.findIndex(img => img.id === imageId);
+        
+        if (imageIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: '圖片不存在'
+            });
+        }
+        
+        const image = sharedData.images[imageIndex];
+        
+        // 檢查權限：管理員可以刪除任何圖片，租客只能刪除自己的圖片
+        if (req.user.role !== 'admin' && image.tenant_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: '無權刪除此圖片'
+            });
+        }
+        
+        // 如果是本地儲存的圖片，刪除檔案
+        if (image.image_url.startsWith('/uploads/')) {
+            try {
+                const filePath = path.join(projectRoot, image.image_url);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log('已刪除圖片檔案:', filePath);
+                }
+            } catch (fileError) {
+                console.warn('刪除圖片檔案時出錯:', fileError);
+            }
+        }
+        
+        // 從陣列中移除
+        sharedData.images.splice(imageIndex, 1);
+        saveData();
+        
+        res.json({
+            success: true,
+            message: '圖片已刪除'
+        });
+    } catch (error) {
+        console.error('刪除圖片錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '伺服器錯誤' 
+        });
+    }
+});
+
 // ========== 管理員 API ==========
 
 // 13. 取得所有租客
@@ -624,25 +866,198 @@ app.get('/api/admin/tenants', authenticateToken, checkAdmin, async (req, res) =>
     }
 });
 
-// 14. API健康檢查
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        success: true, 
-        message: '系統運作正常',
-        timestamp: new Date().toISOString(),
-        dataCounts: {
-            tenants: sharedData.tenants.length,
-            payments: sharedData.payments.length,
-            images: sharedData.images.length
+// 13.1 刪除租客
+app.delete('/api/admin/tenants/:id', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const tenantId = parseInt(req.params.id);
+        
+        // 尋找租客索引
+        const tenantIndex = sharedData.tenants.findIndex(t => t.id === tenantId);
+        
+        if (tenantIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: '租客不存在'
+            });
+        }
+        
+        const tenant = sharedData.tenants[tenantIndex];
+        const tenantName = tenant.name || tenant.username;
+        
+        // 獲取租客的圖片
+        const tenantImages = sharedData.images.filter(img => img.tenant_id === tenantId);
+        
+        // 獲取租客的繳費記錄
+        const tenantPayments = sharedData.payments.filter(p => p.tenant_id === tenantId);
+        
+        // 刪除租客上傳的圖片檔案
+        for (const image of tenantImages) {
+            if (image.image_url.startsWith('/uploads/')) {
+                try {
+                    const filePath = path.join(projectRoot, image.image_url);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log('已刪除租客圖片檔案:', filePath);
+                    }
+                } catch (fileError) {
+                    console.warn('刪除租客圖片檔案時出錯:', fileError);
+                }
+            }
+        }
+        
+        // 刪除租客的圖片記錄
+        sharedData.images = sharedData.images.filter(img => img.tenant_id !== tenantId);
+        
+        // 刪除租客的繳費記錄
+        sharedData.payments = sharedData.payments.filter(p => p.tenant_id !== tenantId);
+        
+        // 刪除租客資料
+        sharedData.tenants.splice(tenantIndex, 1);
+        
+        // 儲存資料
+        saveData();
+        
+        console.log(`已刪除租客 "${tenantName}"，ID: ${tenantId}`);
+        console.log(`同時刪除了 ${tenantImages.length} 張圖片和 ${tenantPayments.length} 筆繳費記錄`);
+        
+        res.json({
+            success: true,
+            message: `已成功刪除租客 "${tenantName}"`,
+            deleted: {
+                tenant: tenantName,
+                images: tenantImages.length,
+                payments: tenantPayments.length
+            }
+        });
+    } catch (error) {
+        console.error('刪除租客錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '伺服器錯誤' 
+        });
+    }
+});
+
+// 14. 取得管理員儀表板資料
+app.get('/api/admin/dashboard', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const totalTenants = sharedData.tenants.length;
+        const totalPayments = sharedData.payments.length;
+        const pendingPayments = sharedData.payments.filter(p => p.status === 'pending').length;
+        const totalImages = sharedData.images.length;
+        
+        // 最近10筆繳費記錄
+        const recentPayments = [...sharedData.payments]
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            .slice(0, 10);
+        
+        // 最近10張圖片
+        const recentImages = [...sharedData.images]
+            .sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at))
+            .slice(0, 10);
+        
+        res.json({
+            success: true,
+            dashboard: {
+                totalTenants,
+                totalPayments,
+                pendingPayments,
+                totalImages,
+                recentPayments,
+                recentImages
+            }
+        });
+    } catch (error) {
+        console.error('取得管理員儀表板錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '伺服器錯誤' 
+        });
+    }
+});
+
+// 15. 取得租客個人資料
+app.get('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const tenant = sharedData.tenants.find(t => t.id === req.user.id);
+        
+        if (!tenant) {
+            return res.status(404).json({
+                success: false,
+                message: '租客資料不存在'
+            });
+        }
+        
+        // 移除密碼字段
+        const { password, ...tenantWithoutPassword } = tenant;
+        
+        res.json({
+            success: true,
+            user: tenantWithoutPassword
+        });
+    } catch (error) {
+        console.error('取得個人資料錯誤:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '伺服器錯誤' 
+        });
+    }
+});
+
+// 建立公開訪問路徑（確保每次啟動都設定）
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// 處理 404
+app.use((req, res) => {
+    // 如果是 API 請求，返回 JSON
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ 
+            success: false, 
+            message: 'API 端點不存在' 
+        });
+    }
+    
+    // 否則返回 404 頁面
+    res.status(404).sendFile(path.join(projectRoot, 'frontend', '404.html'), (err) => {
+        if (err) {
+            res.status(404).send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>404 - 頁面不存在</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        h1 { color: #666; }
+                        a { color: #3498db; text-decoration: none; }
+                    </style>
+                </head>
+                <body>
+                    <h1>404 - 頁面不存在</h1>
+                    <p>抱歉，您要訪問的頁面不存在。</p>
+                    <p><a href="/">返回首頁</a></p>
+                </body>
+                </html>
+            `);
         }
     });
 });
 
-// 處理 404
-app.use((req, res) => {
-    res.status(404).json({ 
-        success: false, 
-        message: '找不到頁面' 
+// 錯誤處理中介軟體
+app.use((err, req, res, next) => {
+    console.error('伺服器錯誤:', err);
+    
+    // 如果是檔案上傳錯誤
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+            success: false,
+            message: `檔案上傳錯誤: ${err.message}`
+        });
+    }
+    
+    // 其他錯誤
+    res.status(500).json({
+        success: false,
+        message: '伺服器內部錯誤: ' + (err.message || '未知錯誤')
     });
 });
 
@@ -651,7 +1066,9 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`=========================================`);
     console.log(`廣大城租客管理系統`);
     console.log(`伺服器運行在端口: ${PORT}`);
-    console.log(`绑定到: 0.0.0.0`);
-    console.log(`外部访问: https://guangda-rental-system-production.up.railway.app`);
+    console.log(`綁定到: 0.0.0.0`);
+    console.log(`上傳目錄: ${UPLOADS_DIR}`);
+    console.log(`專案根目錄: ${projectRoot}`);
+    console.log(`前端目錄: ${path.join(projectRoot, 'frontend')}`);
     console.log(`=========================================`);
 });

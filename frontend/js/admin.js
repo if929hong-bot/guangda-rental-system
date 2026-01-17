@@ -1,428 +1,485 @@
-// frontend/js/admin.js - 修复版
-// 管理員頁面 JavaScript
-let currentUser = null;
-let allTenants = [];
-let allImages = [];
+// frontend/js/admin.js - 管理員後台
+document.addEventListener('DOMContentLoaded', async function() {
+    // 檢查是否登入
+    if (!api.checkAuth()) {
+        window.location.href = 'login.html';
+        return;
+    }
 
-// 頁面載入時初始化
-document.addEventListener('DOMContentLoaded', function() {
-    checkAuth();
-    loadAdminInfo();
+    // 取得使用者資訊
+    const user = api.getUserInfo();
+    if (!user || user.role !== 'admin') {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // 顯示管理員資訊
+    document.getElementById('adminName').textContent = user.name || user.username;
+    if (user.phone) {
+        document.getElementById('adminPhone').textContent = `電話: ${user.phone}`;
+    }
+
+    // 初始化頁面
+    initAdminPage();
     loadBankInfo();
-    loadTenants();
+    loadAllTenants();
     loadAllImages();
 });
 
-// 檢查登入狀態
-function checkAuth() {
-    const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+// 初始化管理員頁面
+function initAdminPage() {
+    // 確保標籤頁正確初始化
+    const activeTabBtn = document.querySelector('.tab-btn.active');
+    const activeTabContent = document.querySelector('.tab-content.active');
     
-    if (!token || user.role !== 'admin') {
-        window.location.href = 'index.html';
-        return;
-    }
-    
-    currentUser = user;
-}
-
-// 載入管理員資訊
-function loadAdminInfo() {
-    if (currentUser) {
-        const adminName = document.getElementById('adminName');
-        const adminPhone = document.getElementById('adminPhone');
+    if (!activeTabBtn || !activeTabContent) {
+        // 如果沒有活動標籤，設定第一個為活動狀態
+        const firstTabBtn = document.querySelector('.tab-btn');
+        const firstTabContent = document.querySelector('.tab-content');
         
-        if (adminName) {
-            adminName.textContent = currentUser.name || currentUser.username;
-        }
-        if (adminPhone) {
-            adminPhone.textContent = `電話：${currentUser.phone}`;
+        if (firstTabBtn && firstTabContent) {
+            firstTabBtn.classList.add('active');
+            firstTabContent.classList.add('active');
         }
     }
 }
 
 // 切換標籤頁
 function switchTab(tabName) {
-    // 移除所有標籤按鈕的 active 類
+    // 移除所有標籤頁的 active 類別
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // 隱藏所有標籤內容
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
     });
     
-    // 啟用當前標籤
-    const activeBtn = document.querySelector(`[onclick="switchTab('${tabName}')"]`);
-    if (activeBtn) {
-        activeBtn.classList.add('active');
+    // 添加 active 類別到目標標籤頁
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(btn => {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabName)) {
+            btn.classList.add('active');
+        }
+    });
+    
+    const tabContent = document.getElementById(tabName + 'Tab');
+    if (tabContent) {
+        tabContent.classList.add('active');
     }
     
-    const activeTab = document.getElementById(`${tabName}Tab`);
-    if (activeTab) {
-        activeTab.classList.add('active');
-    }
-}
-
-// 顯示提示訊息
-function showAlert(message, type = 'success') {
-    const alertDiv = document.getElementById('alertMessage');
-    if (alertDiv) {
-        alertDiv.textContent = message;
-        alertDiv.className = `alert alert-${type}`;
-        alertDiv.style.display = 'block';
-        
-        setTimeout(() => {
-            alertDiv.style.display = 'none';
-        }, 5000);
+    // 根據標籤頁載入資料
+    switch(tabName) {
+        case 'tenants':
+            loadAllTenants();
+            break;
+        case 'images':
+            loadAllImages();
+            break;
+        case 'bank':
+            loadBankInfo();
+            break;
     }
 }
 
 // 載入銀行資訊
-function loadBankInfo() {
-    fetch('/api/bank-info', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
+async function loadBankInfo() {
+    try {
+        const response = await api.bankApi.getBankInfo();
+        const bankInfo = response.bankInfo;
+        
+        if (!bankInfo) {
+            showAlert('未找到銀行資訊', 'error');
+            return;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const bankInfo = data.bankInfo;
-            
-            // 填入表單
-            const bankNameInput = document.getElementById('bankName');
-            const branchNameInput = document.getElementById('branchName');
-            const accountNameInput = document.getElementById('accountName');
-            const accountNumberInput = document.getElementById('accountNumber');
-            
-            if (bankNameInput) bankNameInput.value = bankInfo.bank_name || '';
-            if (branchNameInput) branchNameInput.value = bankInfo.branch_name || '';
-            if (accountNameInput) accountNameInput.value = bankInfo.account_name || '';
-            if (accountNumberInput) accountNumberInput.value = bankInfo.account_number || '';
-            
-            // 顯示當前資訊
-            const currentBankName = document.getElementById('currentBankName');
-            const currentBranchName = document.getElementById('currentBranchName');
-            const currentAccountName = document.getElementById('currentAccountName');
-            const currentAccountNumber = document.getElementById('currentAccountNumber');
-            const lastUpdated = document.getElementById('lastUpdated');
-            const bankInfoDisplay = document.getElementById('bankInfoDisplay');
-            
-            if (currentBankName) currentBankName.textContent = bankInfo.bank_name || '未設定';
-            if (currentBranchName) currentBranchName.textContent = bankInfo.branch_name || '未設定';
-            if (currentAccountName) currentAccountName.textContent = bankInfo.account_name || '未設定';
-            if (currentAccountNumber) currentAccountNumber.textContent = bankInfo.account_number || '未設定';
-            if (lastUpdated) lastUpdated.textContent = new Date(bankInfo.updated_at).toLocaleString('zh-TW');
-            if (bankInfoDisplay) bankInfoDisplay.style.display = 'block';
-        } else {
-            showAlert('載入銀行資訊失敗', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('載入銀行資訊錯誤:', error);
-        showAlert('載入銀行資訊時發生錯誤', 'error');
-    });
+        
+        // 填入表單
+        document.getElementById('bankName').value = bankInfo.bank_name || '';
+        document.getElementById('branchName').value = bankInfo.branch_name || '';
+        document.getElementById('accountName').value = bankInfo.account_name || '';
+        document.getElementById('accountNumber').value = bankInfo.account_number || '';
+        
+        // 顯示目前設定的資訊
+        document.getElementById('currentBankName').textContent = bankInfo.bank_name || '未設定';
+        document.getElementById('currentBranchName').textContent = bankInfo.branch_name || '未設定';
+        document.getElementById('currentAccountName').textContent = bankInfo.account_name || '未設定';
+        document.getElementById('currentAccountNumber').textContent = bankInfo.account_number || '未設定';
+        document.getElementById('lastUpdated').textContent = bankInfo.updated_at ? 
+            new Date(bankInfo.updated_at).toLocaleString('zh-TW') : '未更新';
+        
+        // 顯示資訊區塊
+        document.getElementById('bankInfoDisplay').style.display = 'block';
+        
+        showAlert('銀行資訊載入成功', 'success');
+    } catch (error) {
+        console.error('載入銀行資訊失敗:', error);
+        showAlert('無法載入銀行資訊: ' + (error.message || '請檢查網路連接'), 'error');
+    }
 }
 
 // 儲存銀行資訊
-function saveBankInfo() {
-    const bankNameInput = document.getElementById('bankName');
-    const branchNameInput = document.getElementById('branchName');
-    const accountNameInput = document.getElementById('accountName');
-    const accountNumberInput = document.getElementById('accountNumber');
-    
-    if (!bankNameInput || !branchNameInput || !accountNameInput || !accountNumberInput) {
-        showAlert('表單元素未找到', 'error');
-        return;
-    }
-    
-    const bankInfo = {
-        bank_name: bankNameInput.value,
-        branch_name: branchNameInput.value,
-        account_name: accountNameInput.value,
-        account_number: accountNumberInput.value
+async function saveBankInfo() {
+    const bankData = {
+        bank_name: document.getElementById('bankName').value.trim(),
+        branch_name: document.getElementById('branchName').value.trim(),
+        account_name: document.getElementById('accountName').value.trim(),
+        account_number: document.getElementById('accountNumber').value.trim()
     };
     
-    // 簡單驗證
-    if (!bankInfo.bank_name || !bankInfo.branch_name || !bankInfo.account_name || !bankInfo.account_number) {
-        showAlert('請填寫所有銀行資訊欄位', 'error');
+    // 驗證輸入
+    if (!bankData.bank_name) {
+        showAlert('請輸入銀行名稱', 'error');
         return;
     }
     
-    fetch('/api/bank-info', {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bankInfo)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('銀行資訊已成功更新');
-            loadBankInfo(); // 重新載入顯示最新的資訊
+    if (!bankData.account_name) {
+        showAlert('請輸入戶名', 'error');
+        return;
+    }
+    
+    if (!bankData.account_number) {
+        showAlert('請輸入銀行帳號', 'error');
+        return;
+    }
+    
+    try {
+        showAlert('儲存中...', 'info');
+        
+        const response = await api.bankApi.updateBankInfo(bankData);
+        
+        if (response.success) {
+            showAlert('銀行資訊已成功更新', 'success');
+            
+            // 重新載入銀行資訊以更新顯示
+            setTimeout(() => {
+                loadBankInfo();
+            }, 1500);
         } else {
-            showAlert(data.message || '更新銀行資訊失敗', 'error');
+            showAlert(response.message || '更新失敗', 'error');
         }
-    })
-    .catch(error => {
-        console.error('儲存銀行資訊錯誤:', error);
-        showAlert('儲存銀行資訊時發生錯誤', 'error');
-    });
+    } catch (error) {
+        console.error('儲存銀行資訊失敗:', error);
+        showAlert('儲存失敗: ' + (error.message || '請稍後再試'), 'error');
+    }
 }
 
 // 載入所有租客
-function loadTenants() {
-    const loading = document.getElementById('tenantsLoading');
-    const empty = document.getElementById('tenantsEmpty');
+async function loadAllTenants() {
+    const loadingEl = document.getElementById('tenantsLoading');
+    const emptyEl = document.getElementById('tenantsEmpty');
     const tableBody = document.querySelector('#tenantsTable tbody');
     
-    if (loading) loading.style.display = 'block';
-    if (empty) empty.style.display = 'none';
-    if (tableBody) tableBody.innerHTML = '';
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (tableBody) tableBody.innerHTML = '<tr><td colspan="9" class="loading">載入中...</td></tr>';
     
-    fetch('/api/admin/tenants', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (loading) loading.style.display = 'none';
+    try {
+        const response = await api.adminApi.getAllTenants();
+        const tenants = response.tenants || [];
         
-        if (data.success && data.tenants && data.tenants.length > 0) {
-            allTenants = data.tenants;
-            
-            // 動態生成表格行
-            data.tenants.forEach(tenant => {
-                const row = document.createElement('tr');
-                
-                row.innerHTML = `
-                    <td>${tenant.name || '未提供'}</td>
-                    <td>${tenant.room_number || '未分配'}</td>
-                    <td>${tenant.phone || '未提供'}</td>
-                    <td>${tenant.email || '未提供'}</td>
-                    <td>${tenant.lease_start || '未設定'} ~ ${tenant.lease_end || '未設定'}</td>
-                    <td>NT$ ${parseInt(tenant.rent_amount || 0).toLocaleString('zh-TW')}</td>
-                    <td>${new Date(tenant.created_at).toLocaleDateString('zh-TW')}</td>
-                    <td>
-                        <button class="action-btn action-btn-view" onclick="viewTenantDetails('${tenant.id}')">
-                            <i class="fas fa-eye"></i> 查看詳情
-                        </button>
-                    </td>
-                `;
-                
-                if (tableBody) {
-                    tableBody.appendChild(row);
-                }
-            });
-        } else {
-            if (empty) empty.style.display = 'block';
+        if (loadingEl) loadingEl.style.display = 'none';
+        
+        if (tenants.length === 0) {
+            if (tableBody) tableBody.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
         }
-    })
-    .catch(error => {
-        console.error('載入租客資料錯誤:', error);
-        if (loading) loading.style.display = 'none';
-        showAlert('載入租客資料時發生錯誤', 'error');
+        
+        // 更新表格
+        updateTenantsTable(tenants);
+    } catch (error) {
+        console.error('載入租客列表失敗:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (tableBody) tableBody.innerHTML = '<tr><td colspan="9" class="error">載入失敗，請刷新頁面</td></tr>';
+        showAlert('無法載入租客列表', 'error');
+    }
+}
+
+// 更新租客表格
+function updateTenantsTable(tenants) {
+    const tableBody = document.querySelector('#tenantsTable tbody');
+    
+    if (!tableBody) return;
+    
+    let html = '';
+    
+    tenants.forEach(tenant => {
+        html += `
+            <tr>
+                <td>${escapeHtml(tenant.name || tenant.username)}</td>
+                <td>${escapeHtml(tenant.room_number || '--')}</td>
+                <td>${escapeHtml(tenant.phone || '--')}</td>
+                <td>${escapeHtml(tenant.email || '--')}</td>
+                <td>${formatDate(tenant.lease_start)} - ${formatDate(tenant.lease_end)}</td>
+                <td>NT$ ${tenant.rent_amount ? parseFloat(tenant.rent_amount).toLocaleString() : '0'}</td>
+                <td>${formatDate(tenant.created_at, true)}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="action-btn action-btn-view" onclick="viewTenantDetails(${tenant.id})">
+                            <i class="fas fa-eye"></i> 查看
+                        </button>
+                        <button class="action-btn action-btn-delete" onclick="deleteTenant(${tenant.id}, '${escapeHtml(tenant.name || tenant.username)}')">
+                            <i class="fas fa-trash"></i> 刪除
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableBody.innerHTML = html;
+}
+
+// 刪除租客
+async function deleteTenant(tenantId, tenantName) {
+    // 確認對話框
+    if (!confirm(`確定要刪除租客 "${tenantName}" 嗎？\n\n此操作將會：\n1. 刪除租客帳號\n2. 刪除該租客的繳費記錄\n3. 刪除該租客上傳的圖片\n\n此操作無法復原！`)) {
+        return;
+    }
+    
+    try {
+        showAlert('刪除中...', 'info');
+        
+        const response = await api.adminApi.deleteTenant(tenantId);
+        
+        if (response.success) {
+            showAlert(`已成功刪除租客 "${tenantName}"`, 'success');
+            
+            // 重新載入租客列表
+            setTimeout(() => {
+                loadAllTenants();
+            }, 1000);
+        } else {
+            showAlert(response.message || '刪除失敗', 'error');
+        }
+    } catch (error) {
+        console.error('刪除租客失敗:', error);
+        showAlert('刪除失敗: ' + (error.message || '請稍後再試'), 'error');
+    }
+}
+
+// 載入所有圖片
+async function loadAllImages() {
+    const loadingEl = document.getElementById('imagesLoading');
+    const emptyEl = document.getElementById('imagesEmpty');
+    const imagesGrid = document.getElementById('imagesGrid');
+    
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (imagesGrid) imagesGrid.innerHTML = '<div class="loading">載入中...</div>';
+    
+    try {
+        const response = await api.adminApi.getAllImages();
+        const images = response.images || [];
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+        
+        if (images.length === 0) {
+            if (imagesGrid) imagesGrid.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        
+        // 更新圖片網格
+        updateImagesGrid(images);
+    } catch (error) {
+        console.error('載入圖片失敗:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (imagesGrid) imagesGrid.innerHTML = '<div class="error">載入失敗，請刷新頁面</div>';
+        showAlert('無法載入圖片列表', 'error');
+    }
+}
+
+// 更新圖片網格
+function updateImagesGrid(images) {
+    const imagesGrid = document.getElementById('imagesGrid');
+    
+    if (!imagesGrid) return;
+    
+    let html = '';
+    
+    images.forEach(image => {
+        const fileSizeMB = image.file_size ? (image.file_size / (1024 * 1024)).toFixed(2) : '0.00';
+        const uploadDate = formatDate(image.uploaded_at, true);
+        
+        html += `
+            <div class="image-card">
+                <img src="${escapeHtml(image.image_url)}" alt="${escapeHtml(image.file_name)}" 
+                     class="image-preview" 
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"150\"><rect width=\"200\" height=\"150\" fill=\"%23f0f0f0\"/></svg>'">
+                <div class="image-info">
+                    <h4 title="${escapeHtml(image.file_name)}">${truncateFileName(escapeHtml(image.file_name))}</h4>
+                    <p><i class="fas fa-user"></i> ${escapeHtml(image.tenant_name || image.tenant_id)}</p>
+                    <p><i class="fas fa-calendar"></i> ${uploadDate}</p>
+                    <p><i class="fas fa-weight"></i> ${fileSizeMB} MB</p>
+                    <button class="action-btn action-btn-view" onclick="previewImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}')">
+                        <i class="fas fa-search"></i> 查看
+                    </button>
+                    <button class="action-btn action-btn-download" onclick="downloadImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}')">
+                        <i class="fas fa-download"></i> 下載
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    imagesGrid.innerHTML = html;
+}
+
+// 顯示提示訊息
+function showAlert(message, type = 'info') {
+    const alertEl = document.getElementById('alertMessage');
+    if (!alertEl) return;
+    
+    alertEl.textContent = message;
+    alertEl.className = `alert alert-${type}`;
+    alertEl.style.display = 'block';
+    
+    // 自動隱藏
+    setTimeout(() => {
+        alertEl.style.display = 'none';
+    }, 5000);
+}
+
+// 登出
+function logout() {
+    api.userApi.logout();
+    window.location.href = 'login.html';
+}
+
+// 格式化日期
+function formatDate(dateString, includeTime = false) {
+    if (!dateString) return '--';
+    
+    try {
+        const date = new Date(dateString);
+        
+        if (isNaN(date.getTime())) {
+            return '日期格式錯誤';
+        }
+        
+        if (includeTime) {
+            return date.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        return date.toLocaleDateString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    } catch (error) {
+        return '日期錯誤';
+    }
+}
+
+// 截斷檔案名稱
+function truncateFileName(fileName, maxLength = 20) {
+    if (!fileName || fileName.length <= maxLength) return fileName || '未命名';
+    
+    const extension = fileName.substring(fileName.lastIndexOf('.'));
+    const nameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
+    
+    if (nameWithoutExtension.length <= maxLength - 3) return fileName;
+    
+    return nameWithoutExtension.substring(0, maxLength - 3) + '...' + extension;
+}
+
+// 跳脫 HTML 字元
+function escapeHtml(text) {
+    if (!text) return '';
+    
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    
+    return text.toString().replace(/[&<>"']/g, function(m) { 
+        return map[m]; 
     });
 }
 
 // 查看租客詳情
 function viewTenantDetails(tenantId) {
-    const tenant = allTenants.find(t => t.id == tenantId);
-    
-    if (!tenant) {
-        showAlert('找不到租客資料', 'error');
-        return;
-    }
-    
-    const modal = document.getElementById('tenantModal');
-    const detailsDiv = document.getElementById('tenantDetails');
-    
-    if (!modal || !detailsDiv) {
-        showAlert('無法打開租客詳情', 'error');
-        return;
-    }
-    
-    // 構建詳情HTML
-    detailsDiv.innerHTML = `
-        <div class="detail-item">
-            <div class="detail-label">基本資訊</div>
-            <div class="detail-value">
-                <p><strong>姓名：</strong> ${tenant.name || '未提供'}</p>
-                <p><strong>帳號：</strong> ${tenant.username || '未提供'}</p>
-                <p><strong>電話：</strong> ${tenant.phone || '未提供'}</p>
-                <p><strong>Email：</strong> ${tenant.email || '未提供'}</p>
-            </div>
-        </div>
-        
-        <div class="detail-item">
-            <div class="detail-label">租賃資訊</div>
-            <div class="detail-value">
-                <p><strong>房號：</strong> ${tenant.room_number || '未分配'}</p>
-                <p><strong>月租金：</strong> NT$ ${parseInt(tenant.rent_amount || 0).toLocaleString('zh-TW')}</p>
-                <p><strong>租約期間：</strong> ${tenant.lease_start || '未設定'} 至 ${tenant.lease_end || '未設定'}</p>
-                <p><strong>租約天數：</strong> ${calculateLeaseDays(tenant.lease_start, tenant.lease_end)} 天</p>
-            </div>
-        </div>
-        
-        <div class="detail-item">
-            <div class="detail-label">系統資訊</div>
-            <div class="detail-value">
-                <p><strong>註冊時間：</strong> ${new Date(tenant.created_at).toLocaleString('zh-TW')}</p>
-                <p><strong>最後登入：</strong> ${new Date().toLocaleDateString('zh-TW')}</p>
-                <p><strong>帳號狀態：</strong> <span class="status-badge status-active">正常</span></p>
-            </div>
-        </div>
-        
-        <div class="detail-item">
-            <div class="detail-label">聯絡備註</div>
-            <div class="detail-value">
-                <textarea class="form-control" rows="3" placeholder="可在此記錄與租客的聯絡備註..."></textarea>
-                <button class="btn btn-secondary" style="margin-top: 10px;">儲存備註</button>
+    showAlert('查看租客詳情功能開發中', 'info');
+}
+
+// 預覽圖片
+function previewImage(imageUrl, fileName) {
+    // 建立彈跳窗
+    const modalHtml = `
+        <div class="modal active" id="imagePreviewModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>圖片預覽</h3>
+                    <button class="modal-close" onclick="closeModal('imagePreviewModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div style="text-align: center;">
+                        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(fileName)}" 
+                             style="max-width: 100%; max-height: 60vh; border-radius: 8px;"
+                             onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\"><rect width=\"400\" height=\"300\" fill=\"%23f0f0f0\"/></svg>'">
+                        <p style="margin-top: 15px; color: #666;">${escapeHtml(fileName)}</p>
+                        <div style="margin-top: 20px;">
+                            <button class="btn btn-primary" onclick="downloadImage('${escapeHtml(imageUrl)}', '${escapeHtml(fileName)}')">
+                                <i class="fas fa-download"></i> 下載圖片
+                            </button>
+                            <button class="btn btn-secondary" onclick="closeModal('imagePreviewModal')" style="margin-left: 10px;">
+                                關閉
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
     
-    modal.classList.add('active');
-}
-
-// 計算租約天數
-function calculateLeaseDays(startDate, endDate) {
-    if (!startDate || !endDate) return '未設定';
+    // 移除現有的彈跳窗
+    const existingModal = document.getElementById('imagePreviewModal');
+    if (existingModal) existingModal.remove();
     
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end - start);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return diffDays;
-}
-
-// 載入所有圖片
-function loadAllImages() {
-    const loading = document.getElementById('imagesLoading');
-    const empty = document.getElementById('imagesEmpty');
-    const grid = document.getElementById('imagesGrid');
-    
-    if (loading) loading.style.display = 'block';
-    if (empty) empty.style.display = 'none';
-    if (grid) grid.innerHTML = '';
-    
-    fetch('/api/images', {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (loading) loading.style.display = 'none';
-        
-        if (data.success && data.images && data.images.length > 0) {
-            allImages = data.images;
-            
-            // 動態生成圖片卡片
-            data.images.forEach(image => {
-                const tenant = allTenants.find(t => t.id == image.tenant_id);
-                const tenantName = tenant ? tenant.name : '未知租客';
-                
-                const card = document.createElement('div');
-                card.className = 'image-card';
-                
-                card.innerHTML = `
-                    <img src="${image.image_url}" alt="${image.file_name}" class="image-preview" 
-                         onerror="this.src='https://via.placeholder.com/200x150?text=圖片載入失敗'">
-                    <div class="image-info">
-                        <h4>${image.file_name}</h4>
-                        <p><strong>上傳者：</strong> ${tenantName}</p>
-                        <p><strong>檔案大小：</strong> ${formatFileSize(image.file_size)}</p>
-                        <p><strong>上傳時間：</strong> ${new Date(image.uploaded_at).toLocaleString('zh-TW')}</p>
-                        <div class="action-btns" style="margin-top: 10px;">
-                            <button class="action-btn action-btn-view" onclick="previewImage('${image.image_url}')">
-                                <i class="fas fa-search"></i> 預覽
-                            </button>
-                            <button class="action-btn action-btn-download" onclick="downloadImage('${image.image_url}', '${image.file_name}')">
-                                <i class="fas fa-download"></i> 下載
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                if (grid) {
-                    grid.appendChild(card);
-                }
-            });
-        } else {
-            if (empty) empty.style.display = 'block';
-        }
-    })
-    .catch(error => {
-        console.error('載入圖片錯誤:', error);
-        if (loading) loading.style.display = 'none';
-        showAlert('載入圖片時發生錯誤', 'error');
-    });
-}
-
-// 格式化檔案大小
-function formatFileSize(bytes) {
-    if (!bytes) return '未知大小';
-    
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Byte';
-    
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
-}
-
-// 預覽圖片
-function previewImage(imageUrl) {
-    window.open(imageUrl, '_blank');
+    // 添加新的彈跳窗
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 // 下載圖片
 function downloadImage(imageUrl, fileName) {
-    fetch(imageUrl)
-        .then(response => response.blob())
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName || 'image.jpg';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            
-            showAlert('圖片下載開始');
-        })
-        .catch(error => {
-            console.error('下載圖片錯誤:', error);
-            showAlert('下載圖片時發生錯誤', 'error');
-        });
-}
-
-// 關閉模態框
-function closeModal() {
-    const modal = document.getElementById('tenantModal');
-    if (modal) {
-        modal.classList.remove('active');
+    try {
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = fileName || 'image.jpg';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showAlert('開始下載圖片', 'success');
+    } catch (error) {
+        console.error('下載圖片失敗:', error);
+        showAlert('下載失敗，請手動保存圖片', 'error');
     }
 }
 
-// 登出
-function logout() {
-    if (confirm('確定要登出嗎？')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = 'index.html';
-    }
+// 關閉彈跳窗
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.remove();
 }
+
+// 全域函數
+window.switchTab = switchTab;
+window.logout = logout;
+window.loadBankInfo = loadBankInfo;
+window.saveBankInfo = saveBankInfo;
+window.previewImage = previewImage;
+window.downloadImage = downloadImage;
+window.viewTenantDetails = viewTenantDetails;
+window.deleteTenant = deleteTenant;
+window.closeModal = closeModal;

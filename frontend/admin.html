@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>廣大城租客管理系統 - 管理員</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .container {
@@ -352,6 +352,17 @@
             margin-bottom: 10px;
             color: #ddd;
         }
+        
+        .text-muted {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .error {
+            color: #dc3545;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -489,20 +500,7 @@
         </div>
     </div>
 
-    <!-- 租客詳情模態框 -->
-    <div class="modal" id="tenantModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-user"></i> 租客詳細資料</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body" id="tenantDetails">
-                <!-- 詳情將由 JavaScript 動態填入 -->
-            </div>
-        </div>
-    </div>
-
-    <script src="js/api.js"></script>
-    <script src="js/admin.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/admin.js"></script>
 </body>
 </html>
