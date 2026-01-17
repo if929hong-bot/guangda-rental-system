@@ -215,8 +215,8 @@ function updateTenantsTable(tenants) {
                 <td>${formatDate(tenant.created_at, true)}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="action-btn action-btn-view" onclick="viewTenantDetails(${tenant.id})">
-                            <i class="fas fa-eye"></i> 查看
+                        <button class="action-btn action-btn-payment" onclick="viewPaymentRecords(${tenant.id}, '${escapeHtml(tenant.name || tenant.username)}')">
+                            <i class="fas fa-money-bill-wave"></i> 繳費記錄
                         </button>
                         <button class="action-btn action-btn-delete" onclick="deleteTenant(${tenant.id}, '${escapeHtml(tenant.name || tenant.username)}')">
                             <i class="fas fa-trash"></i> 刪除
@@ -228,6 +228,90 @@ function updateTenantsTable(tenants) {
     });
     
     tableBody.innerHTML = html;
+}
+
+// 查看租客繳費記錄
+async function viewPaymentRecords(tenantId, tenantName) {
+    try {
+        showAlert('載入繳費記錄中...', 'info');
+        
+        const response = await api.adminApi.getTenantPayments(tenantId);
+        const payments = response.payments || [];
+        
+        if (payments.length === 0) {
+            showAlert(`${tenantName} 暫無繳費記錄`, 'info');
+            return;
+        }
+        
+        // 建立繳費記錄彈跳窗
+        const modalHtml = `
+            <div class="modal active" id="paymentRecordsModal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-money-bill-wave"></i> ${tenantName} 的繳費記錄</h3>
+                        <button class="modal-close" onclick="closeModal('paymentRecordsModal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div style="overflow-x: auto;">
+                            <table class="data-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>繳費日期</th>
+                                        <th>房租</th>
+                                        <th>水費</th>
+                                        <th>電費(元/度)</th>
+                                        <th>上期電表</th>
+                                        <th>本期電表</th>
+                                        <th>用電度數</th>
+                                        <th>總金額</th>
+                                        <th>帳號後五碼</th>
+                                        <th>狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${payments.map(payment => {
+                                        const electricityUsage = payment.current_meter - payment.previous_meter;
+                                        return `
+                                            <tr>
+                                                <td>${formatDate(payment.payment_date || payment.created_at)}</td>
+                                                <td>NT$ ${parseFloat(payment.rent_amount).toLocaleString()}</td>
+                                                <td>${payment.water_fee ? `NT$ ${parseFloat(payment.water_fee).toLocaleString()}` : '0'}</td>
+                                                <td>${parseFloat(payment.electricity_rate).toLocaleString()}</td>
+                                                <td>${payment.previous_meter.toLocaleString()}</td>
+                                                <td>${payment.current_meter.toLocaleString()}</td>
+                                                <td>${electricityUsage.toLocaleString()}</td>
+                                                <td>NT$ ${parseFloat(payment.total_amount).toLocaleString()}</td>
+                                                <td>${payment.account_last_five || 'N/A'}</td>
+                                                <td><span class="status-badge ${payment.status}">${payment.status === 'confirmed' ? '已確認' : '待確認'}</span></td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 20px; text-align: center;">
+                            <p><strong>總計：${payments.length} 筆記錄，總金額：NT$ ${payments.reduce((sum, payment) => sum + parseFloat(payment.total_amount || 0), 0).toLocaleString()}</strong></p>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eee; text-align: right;">
+                        <button class="btn btn-secondary" onclick="closeModal('paymentRecordsModal')">關閉</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 移除現有的彈跳窗
+        const existingModal = document.getElementById('paymentRecordsModal');
+        if (existingModal) existingModal.remove();
+        
+        // 添加新的彈跳窗
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        showAlert('繳費記錄載入成功', 'success');
+    } catch (error) {
+        console.error('載入繳費記錄失敗:', error);
+        showAlert('無法載入繳費記錄: ' + (error.message || '請稍後再試'), 'error');
+    }
 }
 
 // 刪除租客
@@ -407,11 +491,6 @@ function escapeHtml(text) {
     });
 }
 
-// 查看租客詳情
-function viewTenantDetails(tenantId) {
-    showAlert('查看租客詳情功能開發中', 'info');
-}
-
 // 預覽圖片
 function previewImage(imageUrl, fileName) {
     // 建立彈跳窗
@@ -480,6 +559,6 @@ window.loadBankInfo = loadBankInfo;
 window.saveBankInfo = saveBankInfo;
 window.previewImage = previewImage;
 window.downloadImage = downloadImage;
-window.viewTenantDetails = viewTenantDetails;
+window.viewPaymentRecords = viewPaymentRecords;
 window.deleteTenant = deleteTenant;
 window.closeModal = closeModal;

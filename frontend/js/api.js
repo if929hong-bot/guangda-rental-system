@@ -191,6 +191,13 @@ const api = {
             });
         },
         
+        // 新增：取得租客繳費記錄
+        async getTenantPayments(tenantId) {
+            return await api.request(`/api/admin/tenants/${tenantId}/payments`, {
+                method: 'GET'
+            });
+        },
+        
         async getAllPayments() {
             return await api.request('/api/payments'); // 管理員會收到所有繳費記錄
         },
