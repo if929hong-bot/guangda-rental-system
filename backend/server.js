@@ -4,18 +4,30 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2/promise');
 const AWS = require('aws-sdk');
-const path = require('path'); // 新增 path 模組
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
+
+// 重要：Railway 会自动设置 PORT 环境变量
 const PORT = process.env.PORT || 3000;
+
+// 调试信息
+console.log('========== 环境信息 ==========');
+console.log('PORT:', PORT);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('当前目录:', __dirname);
+console.log('==============================');
 
 // 中介軟體
 app.use(cors());
 app.use(express.json());
 
-// 提供前端靜態檔案 - 修改為指向 frontend 目錄
-app.use(express.static(path.join(__dirname, '../frontend')));
+// 获取项目根目录路径（server.js 在 backend/ 目录中）
+const projectRoot = path.join(__dirname, '..');
+
+// 提供前端靜態檔案
+app.use(express.static(path.join(projectRoot, 'frontend')));
 
 // JWT 密鑰
 const JWT_SECRET = process.env.JWT_SECRET || 'guangda-rental-secret-key';
@@ -465,9 +477,11 @@ app.use((req, res) => {
 });
 
 // 啟動伺服器
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`=========================================`);
     console.log(`廣大城租客管理系統`);
-    console.log(`伺服器運行在 http://localhost:${PORT}`);
+    console.log(`伺服器運行在端口: ${PORT}`);
+    console.log(`绑定到: 0.0.0.0`);
+    console.log(`外部访问: https://guangda-rental-system-production.up.railway.app`);
     console.log(`=========================================`);
 });
