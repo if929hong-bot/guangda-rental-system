@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -119,6 +119,9 @@
             cursor: pointer;
             font-weight: 500;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .btn-primary {
@@ -150,6 +153,7 @@
         
         .table-container {
             overflow-x: auto;
+            margin: 20px 0;
         }
         
         .data-table {
@@ -203,6 +207,9 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .action-btn-confirm {
@@ -215,9 +222,19 @@
             color: white;
         }
         
+        .action-btn-view {
+            background: #007bff;
+            color: white;
+        }
+        
+        .action-btn-download {
+            background: #6c757d;
+            color: white;
+        }
+        
         .image-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }
@@ -227,6 +244,7 @@
             border-radius: 8px;
             overflow: hidden;
             transition: transform 0.3s;
+            background: white;
         }
         
         .image-card:hover {
@@ -236,8 +254,10 @@
         
         .image-preview {
             width: 100%;
-            height: 150px;
+            height: 180px;
             object-fit: cover;
+            background: #f5f5f5;
+            cursor: pointer;
         }
         
         .image-info {
@@ -247,12 +267,26 @@
         .image-info h4 {
             margin: 0 0 10px 0;
             font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .image-info p {
             margin: 5px 0;
             font-size: 12px;
             color: #666;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .image-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
         }
         
         .modal {
@@ -276,7 +310,7 @@
             background: white;
             border-radius: 10px;
             width: 90%;
-            max-width: 500px;
+            max-width: 800px;
             max-height: 90vh;
             overflow-y: auto;
         }
@@ -330,6 +364,13 @@
             border-radius: 5px;
             margin-bottom: 20px;
             display: none;
+            position: relative;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .alert-success {
@@ -350,16 +391,27 @@
             border: 1px solid #bee5eb;
         }
         
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
         .loading {
             text-align: center;
             padding: 40px;
             color: #666;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
         }
         
         .empty-state {
             text-align: center;
             padding: 40px;
             color: #666;
+            animation: fadeIn 0.5s ease-in-out;
         }
         
         .empty-state i {
@@ -371,6 +423,7 @@
         .text-muted {
             color: #666;
             font-size: 14px;
+            margin-bottom: 20px;
         }
         
         .error {
@@ -379,52 +432,410 @@
             padding: 20px;
         }
         
-        .payment-filter {
-            display: flex;
-            gap: 10px;
+        /* 篩選器樣式 */
+        .filter-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
             margin-bottom: 20px;
-            align-items: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .filters-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 15px;
         }
         
         .filter-group {
             display: flex;
+            flex-direction: column;
             gap: 5px;
-            align-items: center;
+            min-width: 200px;
+            flex: 1;
+        }
+        
+        .filter-group label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
         }
         
         .filter-select {
-            padding: 8px 12px;
+            padding: 10px 12px;
             border: 1px solid #ddd;
             border-radius: 5px;
             background: white;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+            transition: border-color 0.3s;
         }
         
-        .stats-box {
+        .filter-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-group {
             display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 10px;
+            flex: 2;
+            min-width: 300px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .search-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
             flex-wrap: wrap;
+        }
+        
+        /* 統計資訊樣式 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
         }
         
         .stat-card {
             background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            flex: 1;
-            min-width: 200px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 25px 20px;
+            text-align: center;
+            transition: all 0.3s;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .stat-icon {
+            font-size: 36px;
+            margin-bottom: 15px;
+            color: #667eea;
         }
         
         .stat-title {
             font-size: 14px;
             color: #666;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .stat-value {
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 28px;
+            font-weight: 700;
             color: #333;
+        }
+        
+        /* 分頁樣式 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin: 30px 0;
+            padding: 20px 0;
+            border-top: 1px solid #eee;
+        }
+        
+        .page-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #333;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .page-btn:hover:not(.active):not(:disabled) {
+            background: #f5f5f5;
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            cursor: default;
+        }
+        
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .page-dots {
+            padding: 8px 12px;
+            color: #666;
+        }
+        
+        .page-info {
+            margin-left: 20px;
+            color: #666;
+            font-size: 14px;
+            background: #f8f9fa;
+            padding: 8px 16px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+        
+        /* 表格樣式增強 */
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .table-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* 響應式設計 */
+        @media (max-width: 1200px) {
+            .container {
+                padding: 15px;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .tabs {
+                flex-wrap: wrap;
+            }
+            
+            .tab-btn {
+                flex: 1 0 calc(50% - 10px);
+                text-align: center;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .tabs {
+                gap: 5px;
+            }
+            
+            .tab-btn {
+                flex: 1 0 100%;
+                padding: 12px;
+            }
+            
+            .filters-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-group, .search-group {
+                min-width: 100%;
+                width: 100%;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-buttons .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 15px;
+            }
+            
+            .data-table th, 
+            .data-table td {
+                padding: 10px 8px;
+                font-size: 13px;
+            }
+            
+            .pagination {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .page-info {
+                margin-left: 0;
+                margin-top: 10px;
+                width: 100%;
+                text-align: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .tab-btn {
+                font-size: 13px;
+                padding: 10px;
+            }
+            
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .data-table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 10px;
+            }
+        }
+        
+        /* 動畫效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-in-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* 工具提示 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            font-weight: normal;
+        }
+        
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
 </head>
@@ -488,30 +899,39 @@
                 <input type="text" id="accountNumber" class="form-control" placeholder="例如：1234-5678-9012-3456">
             </div>
             
-            <div class="form-group">
+            <div class="action-buttons">
                 <button class="btn btn-primary" onclick="loadBankInfo()">
                     <i class="fas fa-sync"></i> 載入現有資訊
                 </button>
-                <button class="btn btn-primary" onclick="saveBankInfo()" style="margin-left: 10px;">
+                <button class="btn btn-success" onclick="saveBankInfo()">
                     <i class="fas fa-save"></i> 儲存銀行資訊
                 </button>
             </div>
             
-            <div id="bankInfoDisplay" style="margin-top: 30px; display: none;">
-                <h3>目前設定的銀行資訊</h3>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                    <p><strong>銀行名稱：</strong> <span id="currentBankName"></span></p>
-                    <p><strong>分行名稱：</strong> <span id="currentBranchName"></span></p>
-                    <p><strong>戶名：</strong> <span id="currentAccountName"></span></p>
-                    <p><strong>帳號：</strong> <span id="currentAccountNumber"></span></p>
-                    <p><strong>最後更新：</strong> <span id="lastUpdated"></span></p>
+            <div id="bankInfoDisplay" style="margin-top: 30px; display: none; animation: fadeIn 0.5s ease-in-out;">
+                <h3><i class="fas fa-info-circle"></i> 目前設定的銀行資訊</h3>
+                <div style="background: #f8f9fa; padding: 25px; border-radius: 10px; border-left: 4px solid #667eea;">
+                    <p><strong><i class="fas fa-building"></i> 銀行名稱：</strong> <span id="currentBankName" class="detail-value"></span></p>
+                    <p><strong><i class="fas fa-code-branch"></i> 分行名稱：</strong> <span id="currentBranchName" class="detail-value"></span></p>
+                    <p><strong><i class="fas fa-user-tag"></i> 戶名：</strong> <span id="currentAccountName" class="detail-value"></span></p>
+                    <p><strong><i class="fas fa-credit-card"></i> 帳號：</strong> <span id="currentAccountNumber" class="detail-value"></span></p>
+                    <p><strong><i class="fas fa-clock"></i> 最後更新：</strong> <span id="lastUpdated" class="detail-value"></span></p>
                 </div>
             </div>
         </div>
 
         <!-- 租客管理 -->
         <div id="tenantsTab" class="tab-content">
-            <h2><i class="fas fa-users"></i> 租客資料管理</h2>
+            <div class="table-header">
+                <div class="table-title">
+                    <i class="fas fa-users"></i> 租客資料管理
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="loadAllTenants()">
+                        <i class="fas fa-sync"></i> 重新載入
+                    </button>
+                </div>
+            </div>
             <p class="text-muted">查看所有租客註冊的詳細資訊</p>
             
             <div class="table-container">
@@ -535,60 +955,102 @@
             </div>
             
             <div id="tenantsLoading" class="loading">
-                <i class="fas fa-spinner fa-spin"></i> 載入租客資料中...
+                <i class="fas fa-spinner fa-spin fa-2x"></i> 
+                <div style="margin-top: 15px; font-size: 16px;">載入租客資料中...</div>
+                <div style="color: #888; font-size: 14px; margin-top: 10px;">請稍候</div>
             </div>
             
             <div id="tenantsEmpty" class="empty-state" style="display: none;">
-                <i class="fas fa-users-slash"></i>
-                <h3>暫無租客資料</h3>
-                <p>目前還沒有租客註冊</p>
+                <i class="fas fa-users-slash fa-3x"></i>
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">暫無租客資料</h3>
+                <p style="color: #888; max-width: 400px; margin: 0 auto;">目前還沒有租客註冊，租客註冊後會顯示在此處</p>
             </div>
+            
+            <div id="tenantsError" class="error" style="display: none;"></div>
         </div>
 
         <!-- 繳費記錄管理 -->
         <div id="paymentsTab" class="tab-content">
-            <h2><i class="fas fa-money-bill-wave"></i> 繳費記錄管理</h2>
+            <div class="table-header">
+                <div class="table-title">
+                    <i class="fas fa-money-bill-wave"></i> 繳費記錄管理
+                </div>
+            </div>
             <p class="text-muted">查看和管理所有租客的繳費記錄</p>
             
             <!-- 統計資訊 -->
-            <div class="stats-box" id="paymentStats">
+            <div class="stats-grid">
                 <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                    </div>
                     <div class="stat-title">總繳費記錄</div>
                     <div class="stat-value" id="totalPayments">0</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
                     <div class="stat-title">待確認記錄</div>
                     <div class="stat-value" id="pendingPayments">0</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
                     <div class="stat-title">已確認記錄</div>
                     <div class="stat-value" id="confirmedPayments">0</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
                     <div class="stat-title">總金額</div>
                     <div class="stat-value" id="totalAmount">NT$ 0</div>
                 </div>
             </div>
             
             <!-- 篩選器 -->
-            <div class="payment-filter">
-                <div class="filter-group">
-                    <label>狀態篩選：</label>
-                    <select class="filter-select" id="statusFilter" onchange="loadAllPayments()">
-                        <option value="all">全部狀態</option>
-                        <option value="pending">待確認</option>
-                        <option value="confirmed">已確認</option>
-                    </select>
+            <div class="filter-container">
+                <h4 style="margin-top: 0; margin-bottom: 15px; color: #333;">
+                    <i class="fas fa-filter"></i> 篩選條件
+                </h4>
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label>狀態篩選：</label>
+                        <select class="filter-select" id="statusFilter">
+                            <option value="all">全部狀態</option>
+                            <option value="pending">待確認</option>
+                            <option value="confirmed">已確認</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>租客篩選：</label>
+                        <select class="filter-select" id="tenantFilter">
+                            <option value="all">全部租客</option>
+                            <!-- 租客選項將由 JavaScript 動態填入 -->
+                        </select>
+                    </div>
+                    <div class="search-group">
+                        <input type="text" id="paymentSearch" class="search-input" 
+                               placeholder="搜尋租客姓名、房號或帳號後五碼..." 
+                               title="可搜尋租客姓名、房號或帳號後五碼">
+                        <button class="search-btn" id="paymentSearchBtn">
+                            <i class="fas fa-search"></i> 搜尋
+                        </button>
+                    </div>
                 </div>
-                <div class="filter-group">
-                    <label>租客篩選：</label>
-                    <select class="filter-select" id="tenantFilter" onchange="loadAllPayments()">
-                        <option value="all">全部租客</option>
-                    </select>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="loadPaymentsWithPagination(1)">
+                        <i class="fas fa-filter"></i> 套用篩選
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetPaymentFilters()">
+                        <i class="fas fa-redo"></i> 重設篩選
+                    </button>
+                    <button class="btn btn-primary" onclick="loadPaymentsWithPagination(1)">
+                        <i class="fas fa-sync"></i> 重新載入
+                    </button>
                 </div>
-                <button class="btn btn-primary" onclick="loadAllPayments()">
-                    <i class="fas fa-sync"></i> 重新載入
-                </button>
             </div>
             
             <div class="table-container">
@@ -616,39 +1078,397 @@
                 </table>
             </div>
             
+            <!-- 分頁控制 -->
+            <div id="paymentPagination" class="pagination" style="display: none;"></div>
+            
             <div id="paymentsLoading" class="loading">
-                <i class="fas fa-spinner fa-spin"></i> 載入繳費記錄中...
+                <i class="fas fa-spinner fa-spin fa-2x"></i> 
+                <div style="margin-top: 15px; font-size: 16px;">載入繳費記錄中...</div>
+                <div style="color: #888; font-size: 14px; margin-top: 10px;">正在處理您的請求</div>
             </div>
             
             <div id="paymentsEmpty" class="empty-state" style="display: none;">
-                <i class="fas fa-file-invoice-dollar"></i>
-                <h3>暫無繳費記錄</h3>
-                <p>租客尚未提交任何繳費記錄</p>
+                <i class="fas fa-file-invoice-dollar fa-3x"></i>
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">暫無繳費記錄</h3>
+                <p style="color: #888; max-width: 400px; margin: 0 auto;">
+                    目前沒有找到符合篩選條件的繳費記錄<br>
+                    請嘗試調整篩選條件或確認租客已提交繳費記錄
+                </p>
             </div>
+            
+            <div id="paymentsError" class="error" style="display: none;"></div>
         </div>
 
         <!-- 租客圖片管理 -->
         <div id="imagesTab" class="tab-content">
-            <h2><i class="fas fa-images"></i> 租客上傳圖片管理</h2>
+            <div class="table-header">
+                <div class="table-title">
+                    <i class="fas fa-images"></i> 租客上傳圖片管理
+                </div>
+            </div>
             <p class="text-muted">查看和管理租客上傳的圖片檔案</p>
+            
+            <!-- 篩選器 -->
+            <div class="filter-container">
+                <h4 style="margin-top: 0; margin-bottom: 15px; color: #333;">
+                    <i class="fas fa-filter"></i> 篩選條件
+                </h4>
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label>租客篩選：</label>
+                        <select class="filter-select" id="imageTenantFilter">
+                            <option value="all">全部租客</option>
+                            <!-- 租客選項將由 JavaScript 動態填入 -->
+                        </select>
+                    </div>
+                    <div class="search-group">
+                        <input type="text" id="imageSearch" class="search-input" 
+                               placeholder="搜尋檔案名稱或租客姓名..." 
+                               title="可搜尋檔案名稱或租客姓名">
+                        <button class="search-btn" id="imageSearchBtn">
+                            <i class="fas fa-search"></i> 搜尋
+                        </button>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="loadImagesWithPagination(1)">
+                        <i class="fas fa-filter"></i> 套用篩選
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetImageFilters()">
+                        <i class="fas fa-redo"></i> 重設篩選
+                    </button>
+                    <button class="btn btn-primary" onclick="loadImagesWithPagination(1)">
+                        <i class="fas fa-sync"></i> 重新載入
+                    </button>
+                </div>
+            </div>
             
             <div class="image-grid" id="imagesGrid">
                 <!-- 圖片將由 JavaScript 動態填入 -->
             </div>
             
+            <!-- 分頁控制 -->
+            <div id="imagePagination" class="pagination" style="display: none;"></div>
+            
             <div id="imagesLoading" class="loading">
-                <i class="fas fa-spinner fa-spin"></i> 載入圖片中...
+                <i class="fas fa-spinner fa-spin fa-2x"></i> 
+                <div style="margin-top: 15px; font-size: 16px;">載入圖片中...</div>
+                <div style="color: #888; font-size: 14px; margin-top: 10px;">正在取得圖片清單</div>
             </div>
             
             <div id="imagesEmpty" class="empty-state" style="display: none;">
-                <i class="fas fa-images"></i>
-                <h3>暫無上傳圖片</h3>
-                <p>租客尚未上傳任何圖片</p>
+                <i class="fas fa-images fa-3x"></i>
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">暫無上傳圖片</h3>
+                <p style="color: #888; max-width: 400px; margin: 0 auto;">
+                    目前沒有找到符合篩選條件的圖片<br>
+                    請嘗試調整篩選條件或確認租客已上傳圖片
+                </p>
+            </div>
+            
+            <div id="imagesError" class="error" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 圖片預覽模態框 -->
+    <div class="modal" id="imagePreviewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-image"></i> 圖片預覽</h3>
+                <button class="modal-close" onclick="closeModal('imagePreviewModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center;">
+                    <img id="previewImage" src="" alt="預覽圖片" 
+                         style="max-width: 100%; max-height: 60vh; border-radius: 8px; margin-bottom: 20px; background: #f5f5f5; padding: 10px;"
+                         onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\"><rect width=\"400\" height=\"300\" fill=\"%23f0f0f0\"/><text x=\"200\" y=\"150\" text-anchor=\"middle\" fill=\"%23999\" font-family=\"Arial, sans-serif\" font-size=\"16\">圖片載入失敗</text></svg>'">
+                    <div id="previewImageInfo" style="color: #666; font-size: 14px; margin-bottom: 25px; text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <!-- 圖片資訊將由 JavaScript 動態填入 -->
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="downloadPreviewImage()">
+                            <i class="fas fa-download"></i> 下載圖片
+                        </button>
+                        <button class="btn btn-secondary" onclick="closeModal('imagePreviewModal')">
+                            <i class="fas fa-times"></i> 關閉預覽
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="/js/api.js"></script>
     <script src="/js/admin.js"></script>
+    
+    <script>
+        // 初始化事件監聽器
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Admin HTML 頁面載入完成');
+            
+            // 檢查是否已載入必要的 JS 檔案
+            if (typeof api === 'undefined') {
+                console.error('API 模組未載入');
+                showAlert('系統初始化失敗，請刷新頁面', 'error');
+                return;
+            }
+            
+            // 繳費記錄搜索按鈕
+            const paymentSearchBtn = document.getElementById('paymentSearchBtn');
+            if (paymentSearchBtn) {
+                paymentSearchBtn.addEventListener('click', () => {
+                    console.log('繳費記錄搜索按鈕被點擊');
+                    loadPaymentsWithPagination(1);
+                });
+            }
+            
+            // 繳費記錄搜索輸入框
+            const paymentSearchInput = document.getElementById('paymentSearch');
+            if (paymentSearchInput) {
+                paymentSearchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        console.log('在繳費記錄搜索中按下 Enter 鍵');
+                        loadPaymentsWithPagination(1);
+                    }
+                });
+            }
+            
+            // 圖片搜索按鈕
+            const imageSearchBtn = document.getElementById('imageSearchBtn');
+            if (imageSearchBtn) {
+                imageSearchBtn.addEventListener('click', () => {
+                    console.log('圖片搜索按鈕被點擊');
+                    loadImagesWithPagination(1);
+                });
+            }
+            
+            // 圖片搜索輸入框
+            const imageSearchInput = document.getElementById('imageSearch');
+            if (imageSearchInput) {
+                imageSearchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        console.log('在圖片搜索中按下 Enter 鍵');
+                        loadImagesWithPagination(1);
+                    }
+                });
+            }
+            
+            // 繳費記錄篩選器變更事件
+            const statusFilter = document.getElementById('statusFilter');
+            if (statusFilter) {
+                statusFilter.addEventListener('change', () => {
+                    console.log('狀態篩選器變更:', statusFilter.value);
+                    loadPaymentsWithPagination(1);
+                });
+            }
+            
+            const tenantFilter = document.getElementById('tenantFilter');
+            if (tenantFilter) {
+                tenantFilter.addEventListener('change', () => {
+                    console.log('租客篩選器變更:', tenantFilter.value);
+                    loadPaymentsWithPagination(1);
+                });
+            }
+            
+            // 圖片租客篩選器變更事件
+            const imageTenantFilter = document.getElementById('imageTenantFilter');
+            if (imageTenantFilter) {
+                imageTenantFilter.addEventListener('change', () => {
+                    console.log('圖片租客篩選器變更:', imageTenantFilter.value);
+                    loadImagesWithPagination(1);
+                });
+            }
+            
+            // 顯示歡迎訊息
+            setTimeout(() => {
+                const adminName = document.getElementById('adminName').textContent;
+                if (adminName !== '載入中...') {
+                    showAlert(`歡迎回來，${adminName}！`, 'success');
+                }
+            }, 1000);
+        });
+        
+        // 重置繳費記錄篩選器
+        function resetPaymentFilters() {
+            console.log('重置繳費記錄篩選器');
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('tenantFilter').value = 'all';
+            document.getElementById('paymentSearch').value = '';
+            showAlert('篩選條件已重置', 'info');
+            loadPaymentsWithPagination(1);
+        }
+        
+        // 重置圖片篩選器
+        function resetImageFilters() {
+            console.log('重置圖片篩選器');
+            document.getElementById('imageTenantFilter').value = 'all';
+            document.getElementById('imageSearch').value = '';
+            showAlert('篩選條件已重置', 'info');
+            loadImagesWithPagination(1);
+        }
+        
+        // 預覽圖片
+        function previewImage(imageUrl, fileName, tenantName, uploadDate, fileSize) {
+            console.log('預覽圖片:', fileName);
+            const modal = document.getElementById('imagePreviewModal');
+            const previewImage = document.getElementById('previewImage');
+            const previewImageInfo = document.getElementById('previewImageInfo');
+            
+            // 設置圖片
+            previewImage.src = imageUrl;
+            
+            // 設置圖片資訊
+            const fileSizeFormatted = fileSize ? fileSize : '未知大小';
+            const uploadDateFormatted = uploadDate ? uploadDate : '未知時間';
+            const tenantNameFormatted = tenantName ? tenantName : '未知租客';
+            const fileNameFormatted = fileName ? fileName : '未命名';
+            
+            previewImageInfo.innerHTML = `
+                <div style="margin-bottom: 10px;">
+                    <strong><i class="fas fa-file-alt"></i> 檔案名稱：</strong>
+                    <span>${fileNameFormatted}</span>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <strong><i class="fas fa-user"></i> 上傳者：</strong>
+                    <span>${tenantNameFormatted}</span>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <strong><i class="fas fa-calendar-alt"></i> 上傳時間：</strong>
+                    <span>${uploadDateFormatted}</span>
+                </div>
+                <div>
+                    <strong><i class="fas fa-weight-hanging"></i> 檔案大小：</strong>
+                    <span>${fileSizeFormatted}</span>
+                </div>
+            `;
+            
+            modal.classList.add('active');
+        }
+        
+        // 下載預覽的圖片
+        function downloadPreviewImage() {
+            const previewImage = document.getElementById('previewImage');
+            const imageUrl = previewImage.src;
+            
+            if (!imageUrl || imageUrl.includes('data:image/svg+xml')) {
+                showAlert('無法下載此圖片', 'error');
+                return;
+            }
+            
+            const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1) || 'image.jpg';
+            downloadImage(imageUrl, fileName);
+        }
+        
+        // 關閉模態框
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+        
+        // 切換標籤頁
+        function switchTab(tabName) {
+            console.log('切換到標籤頁:', tabName);
+            
+            // 移除所有標籤頁的 active 類別
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 添加 active 類別到目標標籤頁
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach(btn => {
+                if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabName}'`)) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            const tabContent = document.getElementById(tabName + 'Tab');
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+            
+            // 根據標籤頁載入資料
+            switch(tabName) {
+                case 'tenants':
+                    console.log('載入租客管理資料');
+                    loadAllTenants();
+                    break;
+                case 'payments':
+                    console.log('載入繳費記錄管理資料');
+                    loadPaymentsWithPagination(1);
+                    break;
+                case 'images':
+                    console.log('載入圖片管理資料');
+                    loadImagesWithPagination(1);
+                    break;
+                case 'bank':
+                    console.log('載入銀行資訊管理資料');
+                    loadBankInfo();
+                    break;
+            }
+        }
+        
+        // 顯示提示訊息（HTML 版本）
+        function showAlert(message, type = 'info') {
+            const alertEl = document.getElementById('alertMessage');
+            if (!alertEl) return;
+            
+            // 移除所有類別
+            alertEl.className = 'alert';
+            
+            // 設置類別和內容
+            alertEl.classList.add(`alert-${type}`);
+            alertEl.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        ${type === 'success' ? '<i class="fas fa-check-circle"></i>' : 
+                          type === 'error' ? '<i class="fas fa-exclamation-circle"></i>' : 
+                          type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : 
+                          '<i class="fas fa-info-circle"></i>'}
+                        <span style="margin-left: 8px;">${message}</span>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.style.display='none'" 
+                            style="background: none; border: none; color: inherit; cursor: pointer; font-size: 18px;">
+                        &times;
+                    </button>
+                </div>
+            `;
+            
+            alertEl.style.display = 'block';
+            
+            // 自動隱藏（成功訊息 3 秒，其他 5 秒）
+            const hideTime = type === 'success' ? 3000 : 5000;
+            setTimeout(() => {
+                if (alertEl.style.display === 'block') {
+                    alertEl.style.display = 'none';
+                }
+            }, hideTime);
+        }
+        
+        // 登出
+        function logout() {
+            if (confirm('確定要登出嗎？')) {
+                console.log('用戶登出');
+                if (typeof api !== 'undefined' && api.userApi && typeof api.userApi.logout === 'function') {
+                    api.userApi.logout();
+                } else {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
+                window.location.href = 'login.html';
+            }
+        }
+        
+        // 錯誤處理函數
+        function handleError(error, context) {
+            console.error(`在 ${context} 中發生錯誤:`, error);
+            showAlert(`${context} 失敗: ${error.message || '請檢查網路連接'}`, 'error');
+        }
+    </script>
 </body>
 </html>

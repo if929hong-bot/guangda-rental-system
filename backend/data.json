@@ -1,0 +1,99 @@
+{
+  "payments": [
+    {
+      "id": 1,
+      "tenant_id": 2,
+      "tenant_name": "測試租客",
+      "payment_date": "2026-01-17",
+      "rent_amount": 6000,
+      "water_fee": 0,
+      "electricity_rate": 5,
+      "electricity_usage": 200,
+      "electricity_fee": 1000,
+      "previous_meter": 1000,
+      "current_meter": 1200,
+      "total_amount": 7000,
+      "account_last_five": "12345",
+      "status": "pending",
+      "created_at": "2026-01-17T15:26:46.361Z",
+      "updated_at": "2026-01-17T15:26:46.361Z"
+    },
+    {
+      "id": 2,
+      "tenant_id": 1768669862693,
+      "tenant_name": "test",
+      "payment_date": "2026-01-18",
+      "rent_amount": 6000,
+      "water_fee": 100,
+      "electricity_rate": 5,
+      "electricity_usage": 100,
+      "electricity_fee": 500,
+      "previous_meter": 1000,
+      "current_meter": 1100,
+      "total_amount": 6600,
+      "account_last_five": "12345",
+      "status": "pending",
+      "created_at": "2026-01-17T17:12:05.244Z",
+      "updated_at": "2026-01-17T17:12:05.244Z"
+    }
+  ],
+  "images": [
+    {
+      "id": 1,
+      "tenant_id": 2,
+      "tenant_name": "測試租客",
+      "image_url": "/uploads/2/1768663614879-7337m64e.PNG",
+      "file_name": "æ·å.PNG",
+      "file_size": 18350,
+      "file_type": "image/png",
+      "uploaded_at": "2026-01-17T15:26:54.879Z"
+    },
+    {
+      "id": 2,
+      "tenant_id": 1768669862693,
+      "tenant_name": "test",
+      "image_url": "/uploads/1768669862693/1768669930541-kfq9rmjx.jpg",
+      "file_name": "å¾®ä¿¡åç_20250925180421_20_7.jpg",
+      "file_size": 89737,
+      "file_type": "image/jpeg",
+      "uploaded_at": "2026-01-17T17:12:10.541Z"
+    }
+  ],
+  "tenants": [
+    {
+      "id": 2,
+      "username": "tenant",
+      "password": "123456",
+      "name": "測試租客",
+      "email": "tenant@example.com",
+      "phone": "0911111111",
+      "room_number": "101",
+      "lease_start": "2024-01-01",
+      "lease_end": "2024-12-31",
+      "rent_amount": "15000",
+      "role": "tenant",
+      "created_at": "2026-01-17T15:14:49.099Z"
+    },
+    {
+      "id": 1768669862693,
+      "username": "0911222333",
+      "password": "qq123456",
+      "name": "test",
+      "room_number": "101",
+      "email": "fffishau@gmail.com",
+      "phone": "0911222333",
+      "lease_start": "2026-01-17",
+      "lease_end": "2027-01-17",
+      "rent_amount": "6000",
+      "role": "tenant",
+      "created_at": "2026-01-17T17:11:02.693Z"
+    }
+  ],
+  "bankInfo": {
+    "bank_name": "元大銀行",
+    "branch_name": "營業部",
+    "account_name": "廣大城",
+    "account_number": "1111-2222-3333",
+    "updated_at": "2026-01-17T15:14:49.097Z"
+  }
+}

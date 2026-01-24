@@ -6,6 +6,7 @@ const mysql = require('mysql2/promise');
 const AWS = require('aws-sdk');
 const path = require('path');
 const multer = require('multer'); // 新增 multer 處理檔案上傳
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -123,7 +124,6 @@ if (process.env.CF_ACCOUNT_ID && process.env.CF_ACCESS_KEY_ID) {
 }
 
 // ========== 全域資料儲存 ==========
-const fs = require('fs');
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 // 初始化或加載資料
@@ -154,15 +154,45 @@ function loadData() {
             const data = fs.readFileSync(DATA_FILE, 'utf8');
             sharedData = JSON.parse(data);
             console.log('資料已從檔案加載');
+            
+            // 添加測試繳費記錄（如果沒有）
+            if (sharedData.payments.length === 0) {
+                // 找到測試租客
+                const testTenant = sharedData.tenants.find(t => t.username === 'test' || t.username === 'tenant');
+                if (testTenant) {
+                    const testPayment = {
+                        id: 1,
+                        tenant_id: testTenant.id,
+                        tenant_name: testTenant.name || testTenant.username,
+                        payment_date: new Date().toISOString().split('T')[0],
+                        rent_amount: 15000,
+                        water_fee: 300,
+                        electricity_rate: 5.5,
+                        electricity_usage: 100,
+                        electricity_fee: 550,
+                        previous_meter: 1000,
+                        current_meter: 1100,
+                        total_amount: 15850,
+                        account_last_five: '12345',
+                        status: 'pending',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    sharedData.payments.push(testPayment);
+                    saveData();
+                    console.log('測試繳費記錄已創建');
+                }
+            }
         } else {
             // 初始化測試資料
             sharedData.tenants.push({
-                id: 2,
-                username: 'tenant',
+                id: 1,
+                username: 'test',
                 password: '123456',
                 name: '測試租客',
-                email: 'tenant@example.com',
-                phone: '0911111111',
+                email: 'test@example.com',
+                phone: '0912345678',
                 room_number: '101',
                 lease_start: '2024-01-01',
                 lease_end: '2024-12-31',
@@ -170,9 +200,36 @@ function loadData() {
                 role: 'tenant',
                 created_at: new Date().toISOString()
             });
+            
+            // 添加測試繳費記錄
+            sharedData.payments.push({
+                id: 1,
+                tenant_id: 1,
+                tenant_name: '測試租客',
+                payment_date: new Date().toISOString().split('T')[0],
+                rent_amount: 15000,
+                water_fee: 300,
+                electricity_rate: 5.5,
+                electricity_usage: 100,
+                electricity_fee: 550,
+                previous_meter: 1000,
+                current_meter: 1100,
+                total_amount: 15850,
+                account_last_five: '12345',
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
+            
             saveData();
             console.log('測試資料已初始化');
         }
+        
+        console.log('當前資料統計:');
+        console.log('- 租客數:', sharedData.tenants.length);
+        console.log('- 繳費記錄數:', sharedData.payments.length);
+        console.log('- 圖片數:', sharedData.images.length);
+        
     } catch (error) {
         console.error('加載資料檔案失敗:', error);
     }
@@ -286,8 +343,8 @@ app.post('/api/login', async (req, res) => {
         // 租客帳號驗證
         if (role === 'tenant') {
             // 先檢查測試帳號
-            if (username === 'tenant' && password === '123456') {
-                const tenant = sharedData.tenants.find(t => t.username === 'tenant');
+            if (username === 'test' && password === '123456') {
+                const tenant = sharedData.tenants.find(t => t.username === 'test');
                 if (tenant) {
                     const token = jwt.sign(
                         { 
@@ -1004,42 +1061,338 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== 分頁 API ==========
+
+// 16. 分頁取得繳費記錄（修正版本）
+app.get('/api/admin/payments/paginated', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        console.log('分頁取得繳費記錄 API 被調用');
+        console.log('查詢參數:', req.query);
+        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const status = req.query.status || 'all';
+        const tenant_id = req.query.tenant_id || 'all';
+        const search = req.query.search || '';
+        const sort_by = req.query.sort_by || 'created_at';
+        const sort_order = req.query.sort_order || 'DESC';
+        
+        const offset = (page - 1) * limit;
+        
+        console.log('處理參數:');
+        console.log('- page:', page);
+        console.log('- limit:', limit);
+        console.log('- status:', status);
+        console.log('- tenant_id:', tenant_id);
+        console.log('- search:', search);
+        console.log('- offset:', offset);
+        
+        // 複製原始數據進行操作
+        let payments = [...sharedData.payments];
+        
+        // 應用篩選條件
+        console.log('總繳費記錄數（過濾前）:', payments.length);
+        
+        if (status !== 'all') {
+            payments = payments.filter(p => p.status === status);
+            console.log('狀態篩選後:', payments.length);
+        }
+        
+        if (tenant_id !== 'all') {
+            const tenantIdNum = parseInt(tenant_id);
+            payments = payments.filter(p => p.tenant_id === tenantIdNum);
+            console.log('租客篩選後:', payments.length);
+        }
+        
+        if (search && search.trim() !== '') {
+            const searchLower = search.toLowerCase();
+            payments = payments.filter(p => 
+                (p.tenant_name && p.tenant_name.toLowerCase().includes(searchLower)) ||
+                (p.account_last_five && p.account_last_five.includes(search)) ||
+                (p.id && p.id.toString().includes(search))
+            );
+            console.log('搜索篩選後:', payments.length);
+        }
+        
+        // 計算總數
+        const total = payments.length;
+        console.log('最終篩選後記錄數:', total);
+        
+        // 排序
+        payments.sort((a, b) => {
+            let aValue = a[sort_by] || a.created_at;
+            let bValue = b[sort_by] || b.created_at;
+            
+            // 確保是 Date 物件
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+            
+            if (sort_order === 'DESC') {
+                return bValue - aValue;
+            } else {
+                return aValue - bValue;
+            }
+        });
+        
+        // 分頁
+        const paginatedPayments = payments.slice(offset, offset + limit);
+        
+        console.log('分頁後記錄數:', paginatedPayments.length);
+        
+        // 統計資訊
+        const totalAmount = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0);
+        const pendingPayments = payments.filter(p => p.status === 'pending').length;
+        const confirmedPayments = payments.filter(p => p.status === 'confirmed').length;
+        
+        // 為每個繳費記錄添加租客的房間號碼（如果有租客資訊）
+        const paymentsWithRoom = paginatedPayments.map(payment => {
+            const tenant = sharedData.tenants.find(t => t.id === payment.tenant_id);
+            return {
+                ...payment,
+                room_number: tenant ? tenant.room_number : '--'
+            };
+        });
+        
+        const response = {
+            success: true,
+            data: paymentsWithRoom,
+            pagination: {
+                current_page: page,
+                per_page: limit,
+                total_pages: Math.ceil(total / limit) || 1,
+                total_records: total
+            },
+            statistics: {
+                total_payments: total,
+                pending_payments: pendingPayments,
+                confirmed_payments: confirmedPayments,
+                total_amount: totalAmount
+            }
+        };
+        
+        console.log('API 響應結構:', JSON.stringify(response, null, 2));
+        
+        res.json(response);
+    } catch (error) {
+        console.error('分頁取得繳費記錄錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤: ' + error.message,
+            data: [],
+            pagination: {
+                current_page: 1,
+                per_page: 10,
+                total_pages: 1,
+                total_records: 0
+            },
+            statistics: {
+                total_payments: 0,
+                pending_payments: 0,
+                confirmed_payments: 0,
+                total_amount: 0
+            }
+        });
+    }
+});
+
+// 17. 分頁取得圖片
+app.get('/api/admin/images/paginated', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        console.log('分頁取得圖片 API 被調用');
+        console.log('查詢參數:', req.query);
+        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12;
+        const tenant_id = req.query.tenant_id || 'all';
+        const search = req.query.search || '';
+        const sort_by = req.query.sort_by || 'uploaded_at';
+        const sort_order = req.query.sort_order || 'DESC';
+        
+        const offset = (page - 1) * limit;
+        
+        // 複製原始數據進行操作
+        let images = [...sharedData.images];
+        
+        // 應用篩選條件
+        if (tenant_id !== 'all') {
+            const tenantIdNum = parseInt(tenant_id);
+            images = images.filter(i => i.tenant_id === tenantIdNum);
+        }
+        
+        if (search && search.trim() !== '') {
+            const searchLower = search.toLowerCase();
+            images = images.filter(i => 
+                (i.tenant_name && i.tenant_name.toLowerCase().includes(searchLower)) ||
+                (i.file_name && i.file_name.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        // 計算總數
+        const total = images.length;
+        
+        // 排序
+        images.sort((a, b) => {
+            let aValue = a[sort_by] || a.uploaded_at;
+            let bValue = b[sort_by] || b.uploaded_at;
+            
+            // 確保是 Date 物件
+            aValue = new Date(aValue);
+            bValue = new Date(bValue);
+            
+            if (sort_order === 'DESC') {
+                return bValue - aValue;
+            } else {
+                return aValue - bValue;
+            }
+        });
+        
+        // 分頁
+        const paginatedImages = images.slice(offset, offset + parseInt(limit));
+        
+        // 為每個圖片添加租客的房間號碼（如果有租客資訊）
+        const imagesWithRoom = paginatedImages.map(image => {
+            const tenant = sharedData.tenants.find(t => t.id === image.tenant_id);
+            return {
+                ...image,
+                room_number: tenant ? tenant.room_number : '--'
+            };
+        });
+        
+        res.json({
+            success: true,
+            data: imagesWithRoom,
+            pagination: {
+                current_page: page,
+                per_page: limit,
+                total_pages: Math.ceil(total / limit) || 1,
+                total_records: total
+            }
+        });
+    } catch (error) {
+        console.error('分頁取得圖片錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤',
+            data: [],
+            pagination: {
+                current_page: 1,
+                per_page: 12,
+                total_pages: 1,
+                total_records: 0
+            }
+        });
+    }
+});
+
+// 18. 取得租客選項（用於篩選下拉選單）
+app.get('/api/admin/tenant-options', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        console.log('取得租客選項 API 被調用');
+        
+        const tenants = sharedData.tenants.map(tenant => {
+            const { password, ...tenantWithoutPassword } = tenant;
+            return tenantWithoutPassword;
+        });
+        
+        console.log('租客選項數量:', tenants.length);
+        
+        res.json({
+            success: true,
+            data: tenants
+        });
+    } catch (error) {
+        console.error('取得租客選項錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤',
+            data: []
+        });
+    }
+});
+
+// 19. 更新繳費記錄狀態（分頁版本）
+app.put('/api/admin/payments/:id/status', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const paymentId = parseInt(req.params.id);
+        const { status } = req.body;
+
+        console.log('更新繳費記錄狀態:', { paymentId, status });
+
+        if (!['pending', 'confirmed'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: '狀態值無效'
+            });
+        }
+
+        const paymentIndex = sharedData.payments.findIndex(p => p.id === paymentId);
+        
+        if (paymentIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: '繳費記錄不存在'
+            });
+        }
+        
+        // 更新狀態
+        sharedData.payments[paymentIndex].status = status;
+        sharedData.payments[paymentIndex].updated_at = new Date().toISOString();
+        saveData();
+        
+        console.log('繳費記錄狀態更新成功:', sharedData.payments[paymentIndex]);
+        
+        res.json({
+            success: true,
+            message: '繳費記錄狀態已更新'
+        });
+    } catch (error) {
+        console.error('更新繳費記錄狀態錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤'
+        });
+    }
+});
+
 // 建立公開訪問路徑（確保每次啟動都設定）
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // 處理 404
 app.use((req, res) => {
+    console.log('404 錯誤 - 請求路徑:', req.path);
+    
     // 如果是 API 請求，返回 JSON
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ 
             success: false, 
-            message: 'API 端點不存在' 
+            message: 'API 端點不存在: ' + req.path
         });
     }
     
     // 否則返回 404 頁面
-    res.status(404).sendFile(path.join(projectRoot, 'frontend', '404.html'), (err) => {
-        if (err) {
-            res.status(404).send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>404 - 頁面不存在</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        h1 { color: #666; }
-                        a { color: #3498db; text-decoration: none; }
-                    </style>
-                </head>
-                <body>
-                    <h1>404 - 頁面不存在</h1>
-                    <p>抱歉，您要訪問的頁面不存在。</p>
-                    <p><a href="/">返回首頁</a></p>
-                </body>
-                </html>
-            `);
-        }
-    });
+    const filePath = path.join(projectRoot, 'frontend', '404.html');
+    if (fs.existsSync(filePath)) {
+        res.status(404).sendFile(filePath);
+    } else {
+        res.status(404).send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>404 - 頁面不存在</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    h1 { color: #666; }
+                    a { color: #3498db; text-decoration: none; }
+                </style>
+            </head>
+            <body>
+                <h1>404 - 頁面不存在</h1>
+                <p>抱歉，您要訪問的頁面不存在。</p>
+                <p><a href="/">返回首頁</a></p>
+            </body>
+            </html>
+        `);
+    }
 });
 
 // 錯誤處理中介軟體
@@ -1070,5 +1423,14 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`上傳目錄: ${UPLOADS_DIR}`);
     console.log(`專案根目錄: ${projectRoot}`);
     console.log(`前端目錄: ${path.join(projectRoot, 'frontend')}`);
+    console.log(`API 端點數量: 19`);
+    console.log(`=========================================`);
+    console.log(`重要 URL:`);
+    console.log(`- 首頁: http://localhost:${PORT}`);
+    console.log(`- 管理員頁面: http://localhost:${PORT}/admin`);
+    console.log(`- 登入頁面: http://localhost:${PORT}/login`);
+    console.log(`- 租客頁面: http://localhost:${PORT}/tenant`);
+    console.log(`- 註冊頁面: http://localhost:${PORT}/register`);
+    console.log(`- API 健康檢查: http://localhost:${PORT}/api/health`);
     console.log(`=========================================`);
 });

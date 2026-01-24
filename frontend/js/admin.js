@@ -1,14 +1,20 @@
-// frontend/js/admin.js - 管理員後台
+// frontend/js/admin.js - 管理員後台（分頁版本）
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Admin page loaded');
+    
     // 檢查是否登入
     if (!api.checkAuth()) {
+        console.log('Not authenticated, redirecting to login');
         window.location.href = 'login.html';
         return;
     }
 
     // 取得使用者資訊
     const user = api.getUserInfo();
+    console.log('User info:', user);
+    
     if (!user || user.role !== 'admin') {
+        console.log('Not admin user, redirecting to login');
         window.location.href = 'login.html';
         return;
     }
@@ -21,14 +27,31 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // 初始化頁面
     initAdminPage();
+    
+    // 載入租客選項（這個必須最先載入，因為篩選器需要它）
+    await loadTenantOptions();
+    
+    // 載入銀行資訊
     loadBankInfo();
-    loadAllTenants();
-    loadAllPayments();
-    loadAllImages();
+    
+    // 根據當前活動的標籤頁載入資料
+    const activeTabContent = document.querySelector('.tab-content.active');
+    if (activeTabContent) {
+        const tabId = activeTabContent.id;
+        if (tabId === 'paymentsTab') {
+            loadPaymentsWithPagination(1);
+        } else if (tabId === 'imagesTab') {
+            loadImagesWithPagination(1);
+        } else if (tabId === 'tenantsTab') {
+            loadAllTenants();
+        }
+    }
 });
 
 // 初始化管理員頁面
 function initAdminPage() {
+    console.log('Initializing admin page');
+    
     // 確保標籤頁正確初始化
     const activeTabBtn = document.querySelector('.tab-btn.active');
     const activeTabContent = document.querySelector('.tab-content.active');
@@ -43,10 +66,105 @@ function initAdminPage() {
             firstTabContent.classList.add('active');
         }
     }
+    
+    // 初始化分頁事件監聽
+    initPagination();
+}
+
+// 初始化分頁事件監聽
+function initPagination() {
+    console.log('Initializing pagination listeners');
+    
+    // 繳費記錄搜索
+    const paymentSearchBtn = document.getElementById('paymentSearchBtn');
+    if (paymentSearchBtn) {
+        paymentSearchBtn.addEventListener('click', () => loadPaymentsWithPagination(1));
+    }
+    
+    const paymentSearchInput = document.getElementById('paymentSearch');
+    if (paymentSearchInput) {
+        paymentSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadPaymentsWithPagination(1);
+            }
+        });
+    }
+    
+    // 圖片搜索
+    const imageSearchBtn = document.getElementById('imageSearchBtn');
+    if (imageSearchBtn) {
+        imageSearchBtn.addEventListener('click', () => loadImagesWithPagination(1));
+    }
+    
+    const imageSearchInput = document.getElementById('imageSearch');
+    if (imageSearchInput) {
+        imageSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadImagesWithPagination(1);
+            }
+        });
+    }
+    
+    // 篩選器變更事件 - 修復：確保事件監聽器正確綁定
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        console.log('Status filter found, adding event listener');
+        // 移除舊的事件監聽器（如果有）
+        statusFilter.removeEventListener('change', handleStatusFilterChange);
+        // 添加新的事件監聽器
+        statusFilter.addEventListener('change', handleStatusFilterChange);
+    }
+    
+    const tenantFilter = document.getElementById('tenantFilter');
+    if (tenantFilter) {
+        console.log('Tenant filter found, adding event listener');
+        // 移除舊的事件監聽器（如果有）
+        tenantFilter.removeEventListener('change', handleTenantFilterChange);
+        // 添加新的事件監聽器
+        tenantFilter.addEventListener('change', handleTenantFilterChange);
+    }
+    
+    const imageTenantFilter = document.getElementById('imageTenantFilter');
+    if (imageTenantFilter) {
+        console.log('Image tenant filter found, adding event listener');
+        // 移除舊的事件監聽器（如果有）
+        imageTenantFilter.removeEventListener('change', handleImageTenantFilterChange);
+        // 添加新的事件監聽器
+        imageTenantFilter.addEventListener('change', handleImageTenantFilterChange);
+    }
+    
+    // 重新輸入按鈕
+    const resetPaymentBtn = document.getElementById('resetPaymentBtn');
+    if (resetPaymentBtn) {
+        resetPaymentBtn.addEventListener('click', resetPaymentFilters);
+    }
+    
+    const resetImageBtn = document.getElementById('resetImageBtn');
+    if (resetImageBtn) {
+        resetImageBtn.addEventListener('click', resetImageFilters);
+    }
+}
+
+// 篩選器變更處理函數
+function handleStatusFilterChange() {
+    console.log('Status filter changed');
+    loadPaymentsWithPagination(1);
+}
+
+function handleTenantFilterChange() {
+    console.log('Tenant filter changed, value:', document.getElementById('tenantFilter').value);
+    loadPaymentsWithPagination(1);
+}
+
+function handleImageTenantFilterChange() {
+    console.log('Image tenant filter changed');
+    loadImagesWithPagination(1);
 }
 
 // 切換標籤頁
 function switchTab(tabName) {
+    console.log('Switching to tab:', tabName);
+    
     // 移除所有標籤頁的 active 類別
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -57,12 +175,10 @@ function switchTab(tabName) {
     });
     
     // 添加 active 類別到目標標籤頁
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    tabButtons.forEach(btn => {
-        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabName)) {
-            btn.classList.add('active');
-        }
-    });
+    const targetTabBtn = document.querySelector(`[onclick="switchTab('${tabName}')"]`);
+    if (targetTabBtn) {
+        targetTabBtn.classList.add('active');
+    }
     
     const tabContent = document.getElementById(tabName + 'Tab');
     if (tabContent) {
@@ -75,10 +191,10 @@ function switchTab(tabName) {
             loadAllTenants();
             break;
         case 'payments':
-            loadAllPayments();
+            loadPaymentsWithPagination(1);
             break;
         case 'images':
-            loadAllImages();
+            loadImagesWithPagination(1);
             break;
         case 'bank':
             loadBankInfo();
@@ -86,9 +202,304 @@ function switchTab(tabName) {
     }
 }
 
+// 載入租客選項
+async function loadTenantOptions() {
+    try {
+        console.log('Loading tenant options');
+        const response = await api.adminPaginatedApi.getTenantOptions();
+        
+        if (response.success && response.data) {
+            console.log('Tenant options loaded:', response.data.length);
+            
+            // 更新繳費記錄頁面的租客篩選器
+            const tenantFilter = document.getElementById('tenantFilter');
+            if (tenantFilter) {
+                // 保存當前選中的值
+                const currentValue = tenantFilter.value;
+                tenantFilter.innerHTML = '<option value="all">全部租客</option>';
+                
+                response.data.forEach(tenant => {
+                    const option = document.createElement('option');
+                    option.value = tenant.id;
+                    option.textContent = `${tenant.name || tenant.username} (${tenant.room_number || '--'})`;
+                    tenantFilter.appendChild(option);
+                });
+                
+                // 恢復之前選中的值（如果還存在）
+                if (currentValue && currentValue !== 'all') {
+                    tenantFilter.value = currentValue;
+                }
+                
+                console.log('Tenant filter updated with', response.data.length, 'options');
+            }
+            
+            // 更新圖片頁面的租客篩選器
+            const imageTenantFilter = document.getElementById('imageTenantFilter');
+            if (imageTenantFilter) {
+                // 保存當前選中的值
+                const currentValue = imageTenantFilter.value;
+                imageTenantFilter.innerHTML = '<option value="all">全部租客</option>';
+                
+                response.data.forEach(tenant => {
+                    const option = document.createElement('option');
+                    option.value = tenant.id;
+                    option.textContent = `${tenant.name || tenant.username} (${tenant.room_number || '--'})`;
+                    imageTenantFilter.appendChild(option);
+                });
+                
+                // 恢復之前選中的值（如果還存在）
+                if (currentValue && currentValue !== 'all') {
+                    imageTenantFilter.value = currentValue;
+                }
+            }
+            
+            showAlert('租客選項載入完成', 'success');
+        } else {
+            console.error('Failed to load tenant options:', response);
+            showAlert('載入租客選項失敗', 'error');
+        }
+    } catch (error) {
+        console.error('載入租客選項失敗:', error);
+        showAlert('無法載入租客選項: ' + (error.message || '請檢查網路連接'), 'error');
+    }
+}
+
+// 繳費記錄分頁相關變數
+let currentPaymentPage = 1;
+const paymentsPerPage = 10;
+let totalPaymentPages = 1;
+
+// 載入繳費記錄（分頁）
+async function loadPaymentsWithPagination(page = 1) {
+    console.log('Loading payments page:', page);
+    
+    const loadingEl = document.getElementById('paymentsLoading');
+    const emptyEl = document.getElementById('paymentsEmpty');
+    const tableBody = document.querySelector('#paymentsTable tbody');
+    const paginationEl = document.getElementById('paymentPagination');
+    
+    // 顯示載入狀態
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (paginationEl) paginationEl.style.display = 'none';
+    if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="loading">載入中...</td></tr>';
+    
+    try {
+        // 獲取篩選條件
+        const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+        const tenantFilter = document.getElementById('tenantFilter')?.value || 'all';
+        const searchInput = document.getElementById('paymentSearch')?.value || '';
+        
+        console.log('Payment filters:', { 
+            page, 
+            statusFilter, 
+            tenantFilter, 
+            searchInput 
+        });
+        
+        // 呼叫分頁 API
+        const response = await api.adminPaginatedApi.getPayments({
+            page: page,
+            limit: paymentsPerPage,
+            status: statusFilter,
+            tenant_id: tenantFilter,
+            search: searchInput
+        });
+        
+        console.log('Payments API response:', response);
+        
+        // 隱藏載中指示器
+        if (loadingEl) loadingEl.style.display = 'none';
+        
+        if (!response.success) {
+            console.error('API returned error:', response.message);
+            if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="error">載入失敗: ' + (response.message || 'API錯誤') + '</td></tr>';
+            if (emptyEl) emptyEl.style.display = 'none';
+            updatePaymentStats({});
+            return;
+        }
+        
+        if (!response.data || response.data.length === 0) {
+            console.log('No payment data found for current filters');
+            if (tableBody) tableBody.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'block';
+            updatePaymentStats(response.statistics || {});
+            return;
+        }
+        
+        console.log('Found', response.data.length, 'payment records');
+        
+        // 更新表格
+        updatePaymentsTable(response.data);
+        
+        // 更新統計資訊
+        updatePaymentStats(response.statistics || {});
+        
+        // 更新分頁控制
+        currentPaymentPage = response.pagination.current_page;
+        totalPaymentPages = response.pagination.total_pages;
+        
+        if (paginationEl && totalPaymentPages > 1) {
+            renderPagination('paymentPagination', currentPaymentPage, totalPaymentPages, 'changePaymentPage');
+            paginationEl.style.display = 'block';
+        } else if (paginationEl) {
+            paginationEl.style.display = 'none';
+        }
+        
+        // 顯示成功訊息（僅在第一次載入時）
+        if (page === 1) {
+            showAlert(`已載入 ${response.data.length} 筆繳費記錄`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('載入繳費記錄失敗:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="error">載入失敗，請刷新頁面</td></tr>';
+        showAlert('無法載入繳費記錄: ' + (error.message || '請檢查網路連接'), 'error');
+    }
+}
+
+// 更改繳費記錄頁面
+function changePaymentPage(page) {
+    console.log('Changing to payment page:', page);
+    if (page < 1 || page > totalPaymentPages) return;
+    loadPaymentsWithPagination(page);
+}
+
+// 圖片分頁相關變數
+let currentImagePage = 1;
+const imagesPerPage = 12;
+let totalImagePages = 1;
+
+// 載入圖片（分頁）
+async function loadImagesWithPagination(page = 1) {
+    console.log('Loading images page:', page);
+    
+    const loadingEl = document.getElementById('imagesLoading');
+    const emptyEl = document.getElementById('imagesEmpty');
+    const imagesGrid = document.getElementById('imagesGrid');
+    const paginationEl = document.getElementById('imagePagination');
+    
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (paginationEl) paginationEl.style.display = 'none';
+    if (imagesGrid) imagesGrid.innerHTML = '<div class="loading">載入中...</div>';
+    
+    try {
+        // 獲取篩選條件
+        const tenantFilter = document.getElementById('imageTenantFilter')?.value || 'all';
+        const searchInput = document.getElementById('imageSearch')?.value || '';
+        
+        console.log('Image filters:', { tenantFilter, searchInput });
+        
+        // 呼叫分頁 API
+        const response = await api.adminPaginatedApi.getImages({
+            page: page,
+            limit: imagesPerPage,
+            tenant_id: tenantFilter,
+            search: searchInput
+        });
+        
+        console.log('Images API response:', response);
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+        
+        if (!response.success || !response.data || response.data.length === 0) {
+            console.log('No image data found');
+            if (imagesGrid) imagesGrid.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+        
+        // 更新圖片網格
+        updateImagesGrid(response.data);
+        
+        // 更新分頁控制
+        currentImagePage = response.pagination.current_page;
+        totalImagePages = response.pagination.total_pages;
+        
+        if (paginationEl && totalImagePages > 1) {
+            renderPagination('imagePagination', currentImagePage, totalImagePages, 'changeImagePage');
+            paginationEl.style.display = 'block';
+        }
+        
+    } catch (error) {
+        console.error('載入圖片失敗:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (imagesGrid) imagesGrid.innerHTML = '<div class="error">載入失敗，請刷新頁面</div>';
+        showAlert('無法載入圖片列表', 'error');
+    }
+}
+
+// 更改圖片頁面
+function changeImagePage(page) {
+    console.log('Changing to image page:', page);
+    if (page < 1 || page > totalImagePages) return;
+    loadImagesWithPagination(page);
+}
+
+// 渲染分頁控制
+function renderPagination(elementId, currentPage, totalPages, callbackFunction) {
+    const paginationEl = document.getElementById(elementId);
+    if (!paginationEl) return;
+    
+    let html = '';
+    
+    // 上一頁按鈕
+    if (currentPage > 1) {
+        html += `<button class="page-btn" onclick="${callbackFunction}(${currentPage - 1})">
+                    <i class="fas fa-chevron-left"></i> 上一頁
+                </button>`;
+    }
+    
+    // 頁碼按鈕
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button class="page-btn" onclick="${callbackFunction}(1)">1</button>`;
+        if (startPage > 2) {
+            html += '<span class="page-dots">...</span>';
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            html += `<span class="page-btn active">${i}</span>`;
+        } else {
+            html += `<button class="page-btn" onclick="${callbackFunction}(${i})">${i}</button>`;
+        }
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += '<span class="page-dots">...</span>';
+        }
+        html += `<button class="page-btn" onclick="${callbackFunction}(${totalPages})">${totalPages}</button>`;
+    }
+    
+    // 下一頁按鈕
+    if (currentPage < totalPages) {
+        html += `<button class="page-btn" onclick="${callbackFunction}(${currentPage + 1})">
+                    下一頁 <i class="fas fa-chevron-right"></i>
+                </button>`;
+    }
+    
+    // 顯示頁數資訊
+    html += `<div class="page-info">第 ${currentPage} 頁，共 ${totalPages} 頁</div>`;
+    
+    paginationEl.innerHTML = html;
+}
+
 // 載入銀行資訊
 async function loadBankInfo() {
     try {
+        console.log('Loading bank info');
         const response = await api.bankApi.getBankInfo();
         const bankInfo = response.bankInfo;
         
@@ -169,6 +580,8 @@ async function saveBankInfo() {
 
 // 載入所有租客
 async function loadAllTenants() {
+    console.log('Loading all tenants');
+    
     const loadingEl = document.getElementById('tenantsLoading');
     const emptyEl = document.getElementById('tenantsEmpty');
     const tableBody = document.querySelector('#tenantsTable tbody');
@@ -181,6 +594,8 @@ async function loadAllTenants() {
         const response = await api.adminApi.getAllTenants();
         const tenants = response.tenants || [];
         
+        console.log('Tenants loaded:', tenants.length);
+        
         if (loadingEl) loadingEl.style.display = 'none';
         
         if (tenants.length === 0) {
@@ -192,8 +607,6 @@ async function loadAllTenants() {
         // 更新表格
         updateTenantsTable(tenants);
         
-        // 更新繳費記錄頁面的租客篩選器
-        updateTenantFilter(tenants);
     } catch (error) {
         console.error('載入租客列表失敗:', error);
         if (loadingEl) loadingEl.style.display = 'none';
@@ -234,135 +647,41 @@ function updateTenantsTable(tenants) {
     tableBody.innerHTML = html;
 }
 
-// 更新租客篩選器
-function updateTenantFilter(tenants) {
-    const tenantFilter = document.getElementById('tenantFilter');
-    if (!tenantFilter) return;
-    
-    // 保存當前選擇的值
-    const currentValue = tenantFilter.value;
-    
-    // 清空選項（保留「全部租客」選項）
-    while (tenantFilter.options.length > 1) {
-        tenantFilter.remove(1);
-    }
-    
-    // 添加租客選項
-    tenants.forEach(tenant => {
-        const option = document.createElement('option');
-        option.value = tenant.id;
-        option.textContent = `${tenant.name || tenant.username} (${tenant.room_number || '--'})`;
-        tenantFilter.appendChild(option);
-    });
-    
-    // 恢復之前選擇的值
-    if (currentValue && currentValue !== 'all') {
-        tenantFilter.value = currentValue;
-    }
-}
-
-// 載入所有繳費記錄
-async function loadAllPayments() {
-    const loadingEl = document.getElementById('paymentsLoading');
-    const emptyEl = document.getElementById('paymentsEmpty');
-    const tableBody = document.querySelector('#paymentsTable tbody');
-    
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (emptyEl) emptyEl.style.display = 'none';
-    if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="loading">載入中...</td></tr>';
-    
-    try {
-        // 使用 adminApi.getAllPayments() 來取得所有繳費記錄
-        const response = await api.adminApi.getAllPayments();
-        const payments = response.payments || [];
-        
-        if (loadingEl) loadingEl.style.display = 'none';
-        
-        if (payments.length === 0) {
-            if (tableBody) tableBody.innerHTML = '';
-            if (emptyEl) emptyEl.style.display = 'block';
-            updatePaymentStats(payments);
-            return;
-        }
-        
-        // 取得篩選條件
-        const statusFilter = document.getElementById('statusFilter').value;
-        const tenantFilter = document.getElementById('tenantFilter').value;
-        
-        // 篩選繳費記錄
-        let filteredPayments = payments;
-        
-        if (statusFilter !== 'all') {
-            filteredPayments = filteredPayments.filter(payment => payment.status === statusFilter);
-        }
-        
-        if (tenantFilter !== 'all') {
-            filteredPayments = filteredPayments.filter(payment => payment.user_id == tenantFilter);
-        }
-        
-        // 更新表格
-        updatePaymentsTable(filteredPayments);
-        
-        // 更新統計資訊
-        updatePaymentStats(payments);
-        
-    } catch (error) {
-        console.error('載入繳費記錄失敗:', error);
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" class="error">載入失敗，請刷新頁面</td></tr>';
-        showAlert('無法載入繳費記錄: ' + (error.message || '請檢查網路連接'), 'error');
-    }
-}
-
 // 更新繳費記錄表格
 function updatePaymentsTable(payments) {
     const tableBody = document.querySelector('#paymentsTable tbody');
     
     if (!tableBody) return;
     
-    if (payments.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="13" class="empty-state">暫無繳費記錄</td>
-            </tr>
-        `;
-        return;
-    }
-    
     let html = '';
     
-    // 取得租客資訊（為了顯示租客名稱）
-    const tenants = [];
-    try {
-        // 嘗試從本地儲存或先前載入的資料取得租客資訊
-        const tenantsResponse = localStorage.getItem('adminTenants');
-        if (tenantsResponse) {
-            const parsed = JSON.parse(tenantsResponse);
-            tenants.push(...(parsed.tenants || []));
-        }
-    } catch (e) {
-        console.error('取得租客資訊失敗:', e);
-    }
+    console.log('Rendering', payments.length, 'payment records');
     
     payments.forEach(payment => {
-        const electricityUsage = payment.current_meter - payment.previous_meter;
-        const electricityFee = electricityUsage * payment.electricity_rate;
+        // 計算用電量和電費
+        const previousMeter = parseFloat(payment.previous_meter) || 0;
+        const currentMeter = parseFloat(payment.current_meter) || 0;
+        const electricityRate = parseFloat(payment.electricity_rate) || 0;
+        const electricityUsage = currentMeter - previousMeter;
+        const electricityFee = electricityUsage * electricityRate;
         
-        // 尋找對應的租客資訊
-        const tenant = tenants.find(t => t.id == payment.user_id) || {};
+        // 計算總金額（如果沒有總金額，就計算）
+        const rentAmount = parseFloat(payment.rent_amount) || 0;
+        const waterFee = parseFloat(payment.water_fee) || 0;
+        const totalAmount = payment.total_amount ? parseFloat(payment.total_amount) : (rentAmount + waterFee + electricityFee);
         
         html += `
             <tr>
-                <td>${escapeHtml(tenant.name || tenant.username || payment.username || '租客')}</td>
-                <td>${escapeHtml(tenant.room_number || '--')}</td>
+                <td>${escapeHtml(payment.tenant_name || '租客')}</td>
+                <td>${escapeHtml(payment.room_number || '--')}</td>
                 <td>${formatDate(payment.payment_date || payment.created_at)}</td>
-                <td>NT$ ${parseFloat(payment.rent_amount).toLocaleString()}</td>
-                <td>${payment.water_fee ? `NT$ ${parseFloat(payment.water_fee).toLocaleString()}` : '0'}</td>
-                <td>${parseFloat(payment.electricity_rate).toLocaleString()}</td>
-                <td>${payment.previous_meter.toLocaleString()}</td>
-                <td>${payment.current_meter.toLocaleString()}</td>
+                <td>NT$ ${rentAmount.toLocaleString()}</td>
+                <td>${waterFee > 0 ? `NT$ ${waterFee.toLocaleString()}` : '0'}</td>
+                <td>${electricityRate.toLocaleString()}</td>
+                <td>${previousMeter.toLocaleString()}</td>
+                <td>${currentMeter.toLocaleString()}</td>
                 <td>${electricityUsage.toLocaleString()}</td>
-                <td>NT$ ${parseFloat(payment.total_amount).toLocaleString()}</td>
+                <td>NT$ ${totalAmount.toLocaleString()}</td>
                 <td>${payment.account_last_five || 'N/A'}</td>
                 <td>
                     <span class="status-badge status-${payment.status}">
@@ -386,24 +705,17 @@ function updatePaymentsTable(payments) {
 }
 
 // 更新繳費統計資訊
-function updatePaymentStats(payments) {
-    if (!payments || payments.length === 0) {
-        document.getElementById('totalPayments').textContent = '0';
-        document.getElementById('pendingPayments').textContent = '0';
-        document.getElementById('confirmedPayments').textContent = '0';
-        document.getElementById('totalAmount').textContent = 'NT$ 0';
-        return;
+function updatePaymentStats(stats) {
+    if (!stats) {
+        stats = {};
     }
     
-    const totalPayments = payments.length;
-    const pendingPayments = payments.filter(p => p.status === 'pending').length;
-    const confirmedPayments = payments.filter(p => p.status === 'confirmed').length;
-    const totalAmount = payments.reduce((sum, payment) => sum + parseFloat(payment.total_amount || 0), 0);
+    console.log('Updating payment stats:', stats);
     
-    document.getElementById('totalPayments').textContent = totalPayments.toLocaleString();
-    document.getElementById('pendingPayments').textContent = pendingPayments.toLocaleString();
-    document.getElementById('confirmedPayments').textContent = confirmedPayments.toLocaleString();
-    document.getElementById('totalAmount').textContent = `NT$ ${totalAmount.toLocaleString()}`;
+    document.getElementById('totalPayments').textContent = stats.total_payments?.toLocaleString() || '0';
+    document.getElementById('pendingPayments').textContent = stats.pending_payments?.toLocaleString() || '0';
+    document.getElementById('confirmedPayments').textContent = stats.confirmed_payments?.toLocaleString() || '0';
+    document.getElementById('totalAmount').textContent = `NT$ ${parseFloat(stats.total_amount || 0).toLocaleString()}`;
 }
 
 // 確認繳費記錄
@@ -411,14 +723,14 @@ async function confirmPayment(paymentId) {
     try {
         showAlert('確認中...', 'info');
         
-        const response = await api.paymentApi.updatePaymentStatus(paymentId, 'confirmed');
+        const response = await api.adminPaginatedApi.updatePaymentStatus(paymentId, 'confirmed');
         
         if (response.success) {
             showAlert('繳費記錄已確認', 'success');
             
             // 重新載入繳費記錄
             setTimeout(() => {
-                loadAllPayments();
+                loadPaymentsWithPagination(currentPaymentPage);
             }, 1000);
         } else {
             showAlert(response.message || '確認失敗', 'error');
@@ -444,10 +756,20 @@ async function deleteTenant(tenantId, tenantName) {
         if (response.success) {
             showAlert(`已成功刪除租客 "${tenantName}"`, 'success');
             
-            // 重新載入租客列表
+            // 重新載入租客列表和選項
             setTimeout(() => {
                 loadAllTenants();
-                loadAllPayments(); // 重新載入繳費記錄，因為可能刪除了相關記錄
+                loadTenantOptions(); // 重新載入租客選項
+                // 重新載入繳費記錄和圖片（如果它們是活動的）
+                const activeTabContent = document.querySelector('.tab-content.active');
+                if (activeTabContent) {
+                    const tabId = activeTabContent.id;
+                    if (tabId === 'paymentsTab') {
+                        loadPaymentsWithPagination(1);
+                    } else if (tabId === 'imagesTab') {
+                        loadImagesWithPagination(1);
+                    }
+                }
             }, 1000);
         } else {
             showAlert(response.message || '刪除失敗', 'error');
@@ -455,38 +777,6 @@ async function deleteTenant(tenantId, tenantName) {
     } catch (error) {
         console.error('刪除租客失敗:', error);
         showAlert('刪除失敗: ' + (error.message || '請稍後再試'), 'error');
-    }
-}
-
-// 載入所有圖片
-async function loadAllImages() {
-    const loadingEl = document.getElementById('imagesLoading');
-    const emptyEl = document.getElementById('imagesEmpty');
-    const imagesGrid = document.getElementById('imagesGrid');
-    
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (emptyEl) emptyEl.style.display = 'none';
-    if (imagesGrid) imagesGrid.innerHTML = '<div class="loading">載入中...</div>';
-    
-    try {
-        const response = await api.adminApi.getAllImages();
-        const images = response.images || [];
-        
-        if (loadingEl) loadingEl.style.display = 'none';
-        
-        if (images.length === 0) {
-            if (imagesGrid) imagesGrid.innerHTML = '';
-            if (emptyEl) emptyEl.style.display = 'block';
-            return;
-        }
-        
-        // 更新圖片網格
-        updateImagesGrid(images);
-    } catch (error) {
-        console.error('載入圖片失敗:', error);
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (imagesGrid) imagesGrid.innerHTML = '<div class="error">載入失敗，請刷新頁面</div>';
-        showAlert('無法載入圖片列表', 'error');
     }
 }
 
@@ -506,18 +796,21 @@ function updateImagesGrid(images) {
             <div class="image-card">
                 <img src="${escapeHtml(image.image_url)}" alt="${escapeHtml(image.file_name)}" 
                      class="image-preview" 
-                     onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"150\"><rect width=\"200\" height=\"150\" fill=\"%23f0f0f0\"/></svg>'">
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"150\"><rect width=\"200\" height=\"150\" fill=\"%23f0f0f0\"/></svg>'"
+                     onclick="previewImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}', '${escapeHtml(image.tenant_name || '未知')}', '${uploadDate}', '${fileSizeMB} MB')">
                 <div class="image-info">
                     <h4 title="${escapeHtml(image.file_name)}">${truncateFileName(escapeHtml(image.file_name))}</h4>
                     <p><i class="fas fa-user"></i> ${escapeHtml(image.tenant_name || image.tenant_id)}</p>
                     <p><i class="fas fa-calendar"></i> ${uploadDate}</p>
                     <p><i class="fas fa-weight"></i> ${fileSizeMB} MB</p>
-                    <button class="action-btn action-btn-view" onclick="previewImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}')">
-                        <i class="fas fa-search"></i> 查看
-                    </button>
-                    <button class="action-btn action-btn-download" onclick="downloadImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}')">
-                        <i class="fas fa-download"></i> 下載
-                    </button>
+                    <div class="image-actions">
+                        <button class="action-btn action-btn-view" onclick="previewImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}', '${escapeHtml(image.tenant_name || '未知')}', '${uploadDate}', '${fileSizeMB} MB')">
+                            <i class="fas fa-search"></i> 查看
+                        </button>
+                        <button class="action-btn action-btn-download" onclick="downloadImage('${escapeHtml(image.image_url)}', '${escapeHtml(image.file_name)}')">
+                            <i class="fas fa-download"></i> 下載
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -608,41 +901,20 @@ function escapeHtml(text) {
 }
 
 // 預覽圖片
-function previewImage(imageUrl, fileName) {
-    // 建立彈跳窗
-    const modalHtml = `
-        <div class="modal active" id="imagePreviewModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>圖片預覽</h3>
-                    <button class="modal-close" onclick="closeModal('imagePreviewModal')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div style="text-align: center;">
-                        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(fileName)}" 
-                             style="max-width: 100%; max-height: 60vh; border-radius: 8px;"
-                             onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\"><rect width=\"400\" height=\"300\" fill=\"%23f0f0f0\"/></svg>'">
-                        <p style="margin-top: 15px; color: #666;">${escapeHtml(fileName)}</p>
-                        <div style="margin-top: 20px;">
-                            <button class="btn btn-primary" onclick="downloadImage('${escapeHtml(imageUrl)}', '${escapeHtml(fileName)}')">
-                                <i class="fas fa-download"></i> 下載圖片
-                            </button>
-                            <button class="btn btn-secondary" onclick="closeModal('imagePreviewModal')" style="margin-left: 10px;">
-                                關閉
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+function previewImage(imageUrl, fileName, tenantName, uploadDate, fileSize) {
+    const modal = document.getElementById('imagePreviewModal');
+    const previewImage = document.getElementById('previewImage');
+    const previewImageInfo = document.getElementById('previewImageInfo');
+    
+    previewImage.src = imageUrl;
+    previewImageInfo.innerHTML = `
+        <div><strong>檔案名稱：</strong>${fileName || '未命名'}</div>
+        <div><strong>上傳者：</strong>${tenantName || '未知租客'}</div>
+        <div><strong>上傳時間：</strong>${uploadDate || '未知時間'}</div>
+        <div><strong>檔案大小：</strong>${fileSize || '未知大小'}</div>
     `;
     
-    // 移除現有的彈跳窗
-    const existingModal = document.getElementById('imagePreviewModal');
-    if (existingModal) existingModal.remove();
-    
-    // 添加新的彈跳窗
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    modal.classList.add('active');
 }
 
 // 下載圖片
@@ -665,10 +937,37 @@ function downloadImage(imageUrl, fileName) {
 // 關閉彈跳窗
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.remove();
+    if (modal) {
+        modal.classList.remove('active');
+    }
 }
 
-// 全域函數
+// 重置繳費記錄篩選器
+function resetPaymentFilters() {
+    console.log('Resetting payment filters');
+    document.getElementById('statusFilter').value = 'all';
+    document.getElementById('tenantFilter').value = 'all';
+    document.getElementById('paymentSearch').value = '';
+    loadPaymentsWithPagination(1);
+}
+
+// 重置圖片篩選器
+function resetImageFilters() {
+    console.log('Resetting image filters');
+    document.getElementById('imageTenantFilter').value = 'all';
+    document.getElementById('imageSearch').value = '';
+    loadImagesWithPagination(1);
+}
+
+// 下載預覽的圖片
+function downloadPreviewImage() {
+    const previewImage = document.getElementById('previewImage');
+    const imageUrl = previewImage.src;
+    const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1) || 'image.jpg';
+    downloadImage(imageUrl, fileName);
+}
+
+// 確保所有函數都在全域作用域中
 window.switchTab = switchTab;
 window.logout = logout;
 window.loadBankInfo = loadBankInfo;
@@ -677,5 +976,16 @@ window.previewImage = previewImage;
 window.downloadImage = downloadImage;
 window.confirmPayment = confirmPayment;
 window.deleteTenant = deleteTenant;
-window.loadAllPayments = loadAllPayments;
+window.loadPaymentsWithPagination = loadPaymentsWithPagination;
+window.changePaymentPage = changePaymentPage;
+window.changeImagePage = changeImagePage;
 window.closeModal = closeModal;
+window.resetPaymentFilters = resetPaymentFilters;
+window.resetImageFilters = resetImageFilters;
+window.downloadPreviewImage = downloadPreviewImage;
+window.loadAllTenants = loadAllTenants;
+window.loadImagesWithPagination = loadImagesWithPagination;
+// 新增篩選器處理函數到全域
+window.handleStatusFilterChange = handleStatusFilterChange;
+window.handleTenantFilterChange = handleTenantFilterChange;
+window.handleImageTenantFilterChange = handleImageTenantFilterChange;
