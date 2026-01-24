@@ -943,3 +943,137 @@ body {
 .mb-30 { margin-bottom: 30px; }
 
 .hidden { display: none !important; }
+/* 分頁樣式 */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+    padding: 15px 0;
+    border-top: 1px solid #E1E5E9;
+}
+
+.page-btn {
+    padding: 8px 12px;
+    border: 1px solid var(--gray);
+    background: var(--white);
+    color: var(--text-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.page-btn:hover:not(.active) {
+    background: var(--lighter-blue);
+    border-color: var(--primary-color);
+    color: var(--primary-dark);
+}
+
+.page-btn.active {
+    background: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+    cursor: default;
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page-dots {
+    padding: 8px 12px;
+    color: var(--gray-dark);
+}
+
+.page-info {
+    margin-left: 20px;
+    color: var(--gray-dark);
+    font-size: 14px;
+}
+
+/* 篩選器樣式 */
+.payment-filter {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 15px;
+    background: var(--white);
+    border-radius: 8px;
+    border: 1px solid var(--gray);
+}
+
+.filter-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.filter-group label {
+    font-size: 14px;
+    color: var(--primary-dark);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.filter-select {
+    padding: 8px 12px;
+    border: 1px solid var(--gray);
+    border-radius: 4px;
+    background: var(--white);
+    color: var(--text-color);
+    font-size: 14px;
+    min-width: 150px;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 180, 216, 0.1);
+}
+
+#paymentSearch, #imageSearch {
+    min-width: 250px;
+    padding: 8px 12px;
+}
+
+/* 統計卡片樣式 */
+.stats-box {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--white);
+    border: 1px solid var(--gray);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stat-title {
+    font-size: 14px;
+    color: var(--gray-dark);
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
