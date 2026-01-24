@@ -1004,6 +1004,237 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== 分頁 API ==========
+
+// 16. 分頁取得繳費記錄
+app.get('/api/admin/payments/paginated', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 10,
+            status = 'all',
+            tenant_id = 'all',
+            search = '',
+            sort_by = 'created_at',
+            sort_order = 'DESC'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // 複製原始數據進行操作
+        let payments = [...sharedData.payments];
+        
+        // 應用篩選條件
+        if (status !== 'all') {
+            payments = payments.filter(p => p.status === status);
+        }
+        
+        if (tenant_id !== 'all') {
+            payments = payments.filter(p => p.tenant_id == tenant_id);
+        }
+        
+        if (search) {
+            const searchLower = search.toLowerCase();
+            payments = payments.filter(p => 
+                (p.tenant_name && p.tenant_name.toLowerCase().includes(searchLower)) ||
+                (p.account_last_five && p.account_last_five.includes(search))
+            );
+        }
+        
+        // 計算總數
+        const total = payments.length;
+        
+        // 排序
+        payments.sort((a, b) => {
+            const aValue = a[sort_by] || a.created_at;
+            const bValue = b[sort_by] || b.created_at;
+            
+            if (sort_order === 'DESC') {
+                return new Date(bValue) - new Date(aValue);
+            } else {
+                return new Date(aValue) - new Date(bValue);
+            }
+        });
+        
+        // 分頁
+        const paginatedPayments = payments.slice(offset, offset + parseInt(limit));
+        
+        // 統計資訊
+        const totalAmount = payments.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0);
+        const pendingPayments = payments.filter(p => p.status === 'pending').length;
+        const confirmedPayments = payments.filter(p => p.status === 'confirmed').length;
+        
+        // 為每個繳費記錄添加租客的房間號碼（如果有租客資訊）
+        const paymentsWithRoom = paginatedPayments.map(payment => {
+            const tenant = sharedData.tenants.find(t => t.id === payment.tenant_id);
+            return {
+                ...payment,
+                room_number: tenant ? tenant.room_number : '--'
+            };
+        });
+        
+        res.json({
+            success: true,
+            data: paymentsWithRoom,
+            pagination: {
+                current_page: parseInt(page),
+                per_page: parseInt(limit),
+                total_pages: Math.ceil(total / limit),
+                total_records: total
+            },
+            statistics: {
+                total_payments: total,
+                pending_payments: pendingPayments,
+                confirmed_payments: confirmedPayments,
+                total_amount: totalAmount
+            }
+        });
+    } catch (error) {
+        console.error('分頁取得繳費記錄錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤'
+        });
+    }
+});
+
+// 17. 分頁取得圖片
+app.get('/api/admin/images/paginated', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 12,
+            tenant_id = 'all',
+            search = '',
+            sort_by = 'uploaded_at',
+            sort_order = 'DESC'
+        } = req.query;
+
+        const offset = (page - 1) * limit;
+        
+        // 複製原始數據進行操作
+        let images = [...sharedData.images];
+        
+        // 應用篩選條件
+        if (tenant_id !== 'all') {
+            images = images.filter(i => i.tenant_id == tenant_id);
+        }
+        
+        if (search) {
+            const searchLower = search.toLowerCase();
+            images = images.filter(i => 
+                (i.tenant_name && i.tenant_name.toLowerCase().includes(searchLower)) ||
+                (i.file_name && i.file_name.toLowerCase().includes(searchLower))
+            );
+        }
+        
+        // 計算總數
+        const total = images.length;
+        
+        // 排序
+        images.sort((a, b) => {
+            const aValue = a[sort_by] || a.uploaded_at;
+            const bValue = b[sort_by] || b.uploaded_at;
+            
+            if (sort_order === 'DESC') {
+                return new Date(bValue) - new Date(aValue);
+            } else {
+                return new Date(aValue) - new Date(bValue);
+            }
+        });
+        
+        // 分頁
+        const paginatedImages = images.slice(offset, offset + parseInt(limit));
+        
+        // 為每個圖片添加租客的房間號碼（如果有租客資訊）
+        const imagesWithRoom = paginatedImages.map(image => {
+            const tenant = sharedData.tenants.find(t => t.id === image.tenant_id);
+            return {
+                ...image,
+                room_number: tenant ? tenant.room_number : '--'
+            };
+        });
+        
+        res.json({
+            success: true,
+            data: imagesWithRoom,
+            pagination: {
+                current_page: parseInt(page),
+                per_page: parseInt(limit),
+                total_pages: Math.ceil(total / limit),
+                total_records: total
+            }
+        });
+    } catch (error) {
+        console.error('分頁取得圖片錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤'
+        });
+    }
+});
+
+// 18. 取得租客選項（用於篩選下拉選單）
+app.get('/api/admin/tenant-options', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const tenants = sharedData.tenants.map(tenant => {
+            const { password, ...tenantWithoutPassword } = tenant;
+            return tenantWithoutPassword;
+        });
+        
+        res.json({
+            success: true,
+            data: tenants
+        });
+    } catch (error) {
+        console.error('取得租客選項錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤'
+        });
+    }
+});
+
+// 19. 更新繳費記錄狀態（分頁版本）
+app.put('/api/admin/payments/:id/status', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const paymentId = parseInt(req.params.id);
+        const { status } = req.body;
+
+        if (!['pending', 'confirmed'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: '狀態值無效'
+            });
+        }
+
+        const paymentIndex = sharedData.payments.findIndex(p => p.id === paymentId);
+        
+        if (paymentIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: '繳費記錄不存在'
+            });
+        }
+        
+        // 更新狀態
+        sharedData.payments[paymentIndex].status = status;
+        sharedData.payments[paymentIndex].updated_at = new Date().toISOString();
+        saveData();
+        
+        res.json({
+            success: true,
+            message: '繳費記錄狀態已更新'
+        });
+    } catch (error) {
+        console.error('更新繳費記錄狀態錯誤:', error);
+        res.status(500).json({
+            success: false,
+            message: '伺服器錯誤'
+        });
+    }
+});
+
 // 建立公開訪問路徑（確保每次啟動都設定）
 app.use('/uploads', express.static(UPLOADS_DIR));
 
