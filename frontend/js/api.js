@@ -216,6 +216,119 @@ const api = {
         async getProfile() {
             return await api.request('/api/profile');
         }
+    },
+    
+    // ========== 管理員分頁 API ==========
+    adminPaginatedApi: {
+        // 分頁取得繳費記錄
+        async getPayments(params = {}) {
+            try {
+                const token = this.getToken();
+                if (!token) throw new Error('請先登入');
+                
+                const queryParams = new URLSearchParams({
+                    page: params.page || 1,
+                    limit: params.limit || 10,
+                    ...params
+                });
+                
+                const response = await fetch(`/api/admin/payments/paginated?${queryParams}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('取得繳費記錄錯誤:', error);
+                throw error;
+            }
+        },
+        
+        // 分頁取得圖片
+        async getImages(params = {}) {
+            try {
+                const token = this.getToken();
+                if (!token) throw new Error('請先登入');
+                
+                const queryParams = new URLSearchParams({
+                    page: params.page || 1,
+                    limit: params.limit || 12,
+                    ...params
+                });
+                
+                const response = await fetch(`/api/admin/images/paginated?${queryParams}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('取得圖片列表錯誤:', error);
+                throw error;
+            }
+        },
+        
+        // 獲取租客選項（用於篩選）
+        async getTenantOptions() {
+            try {
+                const token = this.getToken();
+                if (!token) throw new Error('請先登入');
+                
+                const response = await fetch('/api/admin/tenant-options', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('獲取租客選項錯誤:', error);
+                throw error;
+            }
+        },
+        
+        // 更新繳費記錄狀態
+        async updatePaymentStatus(paymentId, status) {
+            try {
+                const token = this.getToken();
+                if (!token) throw new Error('請先登入');
+                
+                const response = await fetch(`/api/admin/payments/${paymentId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('更新繳費記錄狀態錯誤:', error);
+                throw error;
+            }
+        }
     }
 };
 
