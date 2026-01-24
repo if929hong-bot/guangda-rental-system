@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
     rent_amount DECIMAL(10,2),
     full_name VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_role (role),
+    INDEX idx_room_number (room_number)
 );
 
 -- 銀行資訊表
@@ -34,6 +36,7 @@ CREATE TABLE IF NOT EXISTS bank_info (
 CREATE TABLE IF NOT EXISTS payment_records (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tenant_id INT NOT NULL,
+    tenant_name VARCHAR(100),
     payment_date DATE NOT NULL,
     rent_amount DECIMAL(10,2) NOT NULL,
     water_fee DECIMAL(10,2) DEFAULT 0,
@@ -44,18 +47,24 @@ CREATE TABLE IF NOT EXISTS payment_records (
     account_last_five VARCHAR(5),
     status ENUM('pending', 'confirmed') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_tenant_id (tenant_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_tenant_id (tenant_id),
+    INDEX idx_status (status),
+    INDEX idx_payment_date (payment_date),
+    INDEX idx_created_at (created_at)
 );
 
 -- 上傳圖片表
 CREATE TABLE IF NOT EXISTS uploaded_images (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tenant_id INT NOT NULL,
+    tenant_name VARCHAR(100),
     image_url VARCHAR(500) NOT NULL,
     file_name VARCHAR(255),
     file_size INT,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_tenant_id (tenant_id)
+    INDEX idx_tenant_id (tenant_id),
+    INDEX idx_uploaded_at (uploaded_at)
 );
 
 -- 插入預設管理員帳號 (密碼: admin123)
